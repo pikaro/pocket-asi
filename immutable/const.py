@@ -1,0 +1,28 @@
+"""Constants."""
+
+SHELL_CONTAINER_NODE_TYPES = [
+    'command',
+    'subshell',
+    'pipeline',
+    'and_or',
+    'list',
+    'compound',
+    'function',
+    'if',
+    'case',
+    'while',
+    'until',
+    'for',
+    'select',
+    'arith',
+    'redirect',
+    'assign',
+    'time',
+    'coproc',
+    'proc',
+    'cond',
+    'extglob',
+    'regex',
+    'brace',
+    'param',
+]

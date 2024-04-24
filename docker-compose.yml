@@ -1,0 +1,8 @@
+services:
+  system:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./mutable:/app/mutable
+      - ./immutable:/app/immutable:ro

@@ -1,0 +1,106 @@
+[project]
+name = "pocket-asi"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+ollama = "^0.1.8"
+coloredlogs = "^15.0.1"
+pydantic = "^2.7.1"
+inotify_simple = "^1.3.5"
+bashlex = "^0.18"
+
+[tool.pydoclint]
+style = "google"
+arg-type-hints-in-docstring = false
+check-return-types = true
+check-yield-types = true
+
+[tool.pyright]
+exclude = [
+    ".venv",
+    "**/__pycache__",
+    "**/*.pyc",
+]
+venv = ".venv"
+venvPath = "."
+reportShadowedImport = "warning"
+reportMissingSuperCall =  false
+reportUninitializedInstanceVariable = "warning"
+reportPropertyTypeMismatch = "warning"
+reportUnusedCallResult = "warning"
+reportUnusedImport = "information"
+
+[tool.ruff]
+exclude = [
+    ".venv",
+]
+line-length = 100
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+extend-select = [
+    "F",     # Pyflakes
+    "N",     # pep8 names
+    "D",     # Pydocstyle
+    "I",     # isort
+    "UP",    # Pyupgrade
+    "E",     # Pycodestyle
+    "EM",    # flake8-errmsg
+    "W",     # Pycodestyle
+    "C4",    # flake8-comprehensions
+    "B",     # flake8-bugbear
+    "S",     # flake8-bandit
+    "EM",    # flake8-errmsg
+    "A",     # flake8-builtins
+    "C90",   # McCabe
+    "ASYNC", # flake8-async
+    "ICN",   # flake8-import-conventions
+    "PIE",   # flake8-pie
+    "SLF",   # flake8-self
+    "RSE",   # flake8-raise
+    "RET",   # flake8-return
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+    "TID",   # flake8-tidy-imports
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "PL",    # Pylint
+    "TRY",   # Tryceratops
+    "RUF",   # RUFF
+    "FLY",   # FLYNT
+    "FURB",  # refurb
+    #"TD",    # flake8-todo
+    #"FIX",   # flake8-fixme
+]
+ignore = [
+    # Covered by Pyright
+    "F821", # Unknown name
+    "F401", # Unused import
+]
+
+[tool.ruff.lint.per-file-ignores]
+"shell.py" = ["S603"] # Untrusted input - kinda the whole point
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.pydocstyle]
+convention = "google"
