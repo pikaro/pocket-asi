@@ -33,53 +33,57 @@ EXIT_TIMEOUT = 1000
 class Shell(BaseModel):
     """Interactive shell."""
 
-    shell: subprocess.Popen
-    stdin: IO
-    q_stdout: Queue[OutputLine]
-    q_stderr: Queue[OutputLine]
+    _shell: subprocess.Popen
+    _stdin: IO
+    _q_stdout: Queue[OutputLine]
+    _q_stderr: Queue[OutputLine]
+    _thread_stdout: threading.Thread
+    _thread_stderr: threading.Thread
 
     def __init__(self):
         """Create shell process and streams."""
-        self.shell = subprocess.Popen(
+        super().__init__()
+
+        self._shell = subprocess.Popen(
             ['/bin/sh'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
 
-        if not self.shell.stdout or not self.shell.stdin or not self.shell.stderr:
+        if not self._shell.stdout or not self._shell.stdin or not self._shell.stderr:
             _err = 'Shell streams are not available'
             raise ValueError(_err)
 
-        self.stdin = self.shell.stdin
-        self.q_stdout = Queue()
-        self.q_stderr = Queue()
-        self.thread_stdout = threading.Thread(
-            target=enqueue_output, args=(self.shell.stdout, self.q_stdout)
+        self._stdin = self._shell.stdin
+        self._q_stdout = Queue()
+        self._q_stderr = Queue()
+        self._thread_stdout = threading.Thread(
+            target=enqueue_output, args=(self._shell.stdout, self._q_stdout)
         )
-        self.thread_stderr = threading.Thread(
-            target=enqueue_output, args=(self.shell.stderr, self.q_stderr)
+        self._thread_stderr = threading.Thread(
+            target=enqueue_output, args=(self._shell.stderr, self._q_stderr)
         )
-        self.thread_stdout.daemon = True
-        self.thread_stderr.daemon = True
-        self.thread_stdout.start()
-        self.thread_stderr.start()
+        self._thread_stdout.daemon = True
+        self._thread_stderr.daemon = True
+        self._thread_stdout.start()
+        self._thread_stderr.start()
 
     def _put_stdin(self, command: str) -> None:
         """Execute a command in the shell."""
-        _ = self.stdin.write(command.encode('utf-8') + b'\n')
-        self.stdin.flush()
+        _ = self._stdin.write(command.encode('utf-8') + b'\n')
+        self._stdin.flush()
 
     def _get_stdout(self) -> list[OutputLine]:
         """Get the stdout from the shell."""
-        stdout = list(self.q_stdout.queue)
-        self.q_stdout.queue.clear()
+        stdout = list(self._q_stdout.queue)
+        self._q_stdout.queue.clear()
         return stdout
 
     def _get_stderr(self) -> list[OutputLine]:
         """Get the stderr from the shell."""
-        stderr = list(self.q_stderr.queue)
-        self.q_stderr.queue.clear()
+        stderr = list(self._q_stderr.queue)
+        self._q_stderr.queue.clear()
         return stderr
 
     def _lex(self, command: str) -> None:

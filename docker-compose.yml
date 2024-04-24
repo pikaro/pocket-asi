@@ -5,4 +5,5 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./mutable:/app/mutable
-      - ./immutable:/app/immutable:ro
+    environment:
+      LOG_LEVEL: debug

@@ -70,15 +70,17 @@ def _from_commands(commands: CommandHistory) -> Sequence[ollama.Message]:
 class Llama(BaseModel):
     """Llama chatbot."""
 
-    config: ollama.Options
-    client: ollama.Client
-    shell: Shell
-    history: CommandHistory
+    _config: ollama.Options
+    _client: ollama.Client
+    _shell: Shell
+    _history: CommandHistory
 
     def __init__(self, shell: Shell):
         """Initialize the Llama chatbot."""
-        self.client = ollama.Client(host=f'http://{OLLAMA_HOST}:11434')
-        self.shell = shell
+        super().__init__()
+
+        self._client = ollama.Client(host=f'http://{OLLAMA_HOST}:11434')
+        self._shell = shell
 
         try:
             config_json = Path(CONFIG_PATH).read_text(encoding='utf-8')
@@ -90,8 +92,8 @@ class Llama(BaseModel):
         except json.JSONDecodeError:
             config = {}
 
-        self.config = config | {'num_ctx': N_CTX, 'num_predict': N_CTX}
-        self.history = _initial_commands(shell)
+        self._config = config | {'num_ctx': N_CTX, 'num_predict': N_CTX}
+        self._history = _initial_commands(shell)
 
     def prompt(self) -> LlmResponse:
         """Prompt the LLM for shell input using the command / output history."""
@@ -106,17 +108,17 @@ class Llama(BaseModel):
                 'role': 'system',
                 'content': system,
             },
-            *_from_commands(self.history),
+            *_from_commands(self._history),
         ]
         return cast(
             LlmResponse,
-            self.client.chat(
+            self._client.chat(
                 model=MODEL,
                 messages=messages,
-                options=self.config,
+                options=self._config,
             ),
         )
 
     def append(self, result: CommandResult) -> None:
         """Append a command result to the history."""
-        self.history.append(result)
+        self._history.append(result)

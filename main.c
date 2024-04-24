@@ -24,7 +24,7 @@ void log_message(const char* message, ...) {
     vasprintf(&rendered_message, message, args);
     va_end(args);
 
-    printf("%-9s - %-8s - %-8s - %s\n", buf, "INFO", "cloader", rendered_message);
+    fprintf(stderr, "%-9s - %-8s - %-8s - %s\n", buf, "INFO", "cloader", rendered_message);
 }
 
 char* path_join(const char* dir, const char* filename) {
@@ -40,6 +40,7 @@ char* path_join(const char* dir, const char* filename) {
 }
 
 char* read_file(const char* path) {
+    log_message("Reading %s", path);
     FILE* file = fopen(path, "rb");
     if (!file) {
         perror("fopen failed");
@@ -120,6 +121,8 @@ int main(int argc, char** argv) {
     char *root, *loader, *python;
     int loader_fd=-1;
 
+    log_message("Starting cloader");
+
     root = getenv("POCKET_ASI_ROOT");
     if (!root) {
         perror("POCKET_ASI_ROOT not set");
@@ -135,6 +138,8 @@ int main(int argc, char** argv) {
         perror("POCKET_ASI_PYTHON not set");
         return 1;
     }
+
+    log_message("Looking for loader %s in %s", loader, root);
 
     char* pattern = path_join(root, "*");
     struct LsResult ls_result = ls(pattern);
@@ -187,17 +192,13 @@ int main(int argc, char** argv) {
     free(fds);
     free(names);
 
-    char* env = malloc(strlen("POCKET_ASI_FILES=") + json_bytes);
-    if (!env) {
-        perror("malloc failed");
+    if (setenv("POCKET_ASI_FILES", json, 1) != 0) {
+        perror("setenv failed");
         return 1;
     }
-    sprintf(env, "POCKET_ASI_FILES=%s", json);
-    putenv(env);
 
-    log_message("Exported FDs to environmment: %s", env);
+    log_message("Exported FDs to environmment");
     free(json);
-    free(env);
 
     char* loader_fd_file = malloc(14 + snprintf(NULL, 0, "%d", loader_fd));
     sprintf(loader_fd_file, "/proc/self/fd/%d", loader_fd);
