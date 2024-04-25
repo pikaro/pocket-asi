@@ -15,8 +15,10 @@ python = "^3.12"
 ollama = "^0.1.8"
 coloredlogs = "^15.0.1"
 pydantic = "^2.7.1"
-inotify_simple = "^1.3.5"
 bashlex = "^0.18"
+pygments = "^2.17.2"
+psutil = "^5.9.8"
+termcolor = "^2.4.0"
 
 [tool.pydoclint]
 style = "google"
@@ -86,6 +88,7 @@ ignore = [
     # Covered by Pyright
     "F821", # Unknown name
     "F401", # Unused import
+    "S101", # Use of assert detected
 ]
 
 [tool.ruff.lint.per-file-ignores]
