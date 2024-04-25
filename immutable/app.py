@@ -1,6 +1,7 @@
 """Main entrypoint for the application."""
 
 import json
+import re
 from time import sleep
 
 import pygments.formatters
@@ -8,6 +9,7 @@ import pygments.lexers
 from coloredlogs import logging
 from termcolor import colored
 
+from immutable.const import CLEANUPS
 from immutable.llama import Llama
 from immutable.shell import Shell
 from immutable.typedefs import CommandResult
@@ -32,6 +34,23 @@ def _log_output(result: CommandResult) -> None:
         log.error(f'Exited with code {result["exit_code"]}')
 
 
+def _cleanup(command: str) -> str:
+    """Clean up a command for display."""
+    command_clean = command
+    while True:
+        match = False
+        for cleanup in CLEANUPS:
+            command_clean = re.sub(cleanup[0], cleanup[1], command, flags=re.DOTALL)
+            if command_clean != command:
+                log.warning(f'Cleaned up command: {command_clean}')
+                command = command_clean
+                match = True
+        if not match:
+            break
+
+    return command_clean
+
+
 def run() -> None:
     """Run the application."""
     log.info('Starting application')
@@ -42,7 +61,12 @@ def run() -> None:
     log.info(f'Awaiting first command (PS1: {prompt})')
     while True:
         response = llama.prompt()
-        command = response['message']['content']
+        command = _cleanup(response['message']['content'])
+
+        if prompt in command:
+            log.warning('Command contains prompt')
+            command = command.replace(prompt, '')
+
         log.info(f'{colored(prompt, 'white', force_color=True)}{_highlight_bash(command)}')
 
         result = shell.run(command)

@@ -6,3 +6,7 @@ SHELL_INTERACTIVE_COMMANDS = [
     'less',
     'more',
 ]
+
+CLEANUPS: list[tuple[str, str]] = [
+    (r'```(python)?(.*?)```', r'\2'),
+]
