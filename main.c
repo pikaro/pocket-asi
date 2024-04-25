@@ -24,7 +24,7 @@ void log_message(const char* message, ...) {
     vasprintf(&rendered_message, message, args);
     va_end(args);
 
-    fprintf(stderr, "%-9s - %-8s - %-8s - %s\n", buf, "INFO", "cloader", rendered_message);
+    fprintf(stderr, "%-9s - %-8s - %-22s - %s\n", buf, "INFO", "cloader", rendered_message);
 }
 
 char* path_join(const char* dir, const char* filename) {

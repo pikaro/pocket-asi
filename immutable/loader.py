@@ -13,7 +13,7 @@ import coloredlogs
 
 coloredlogs.install(
     level=os.getenv('LOG_LEVEL', 'INFO').upper(),
-    fmt='%(asctime)-9s - %(levelname)-8s - %(name)-8s - %(message)s',
+    fmt='%(asctime)-9s - %(levelname)-8s - %(name)-22s - %(message)s',
     datefmt='%M:%S.%f',
     isatty=True,
 )

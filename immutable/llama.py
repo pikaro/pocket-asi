@@ -11,6 +11,7 @@ import ollama
 from coloredlogs import logging
 from pydantic import BaseModel
 
+from immutable.common import fd_path
 from immutable.shell import Shell
 from immutable.typedefs import CommandHistory, CommandResult, LlmResponse
 
@@ -19,6 +20,7 @@ N_CTX = 8192
 CONFIG_PATH = '/app/mutable/config.json'
 TOKENIZER = '/app/immutable/tokenizer.json'
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'localhost')
+CONFIG_BASE: ollama.Options = {'num_ctx': N_CTX, 'num_predict': N_CTX}
 
 log = logging.getLogger(__name__)
 
@@ -70,7 +72,6 @@ def _from_commands(commands: CommandHistory) -> Sequence[ollama.Message]:
 class Llama(BaseModel):
     """Llama chatbot."""
 
-    _config: ollama.Options
     _client: ollama.Client
     _shell: Shell
     _history: CommandHistory
@@ -79,25 +80,34 @@ class Llama(BaseModel):
         """Initialize the Llama chatbot."""
         super().__init__()
 
+        log.info(f'Initializing Llama with host {OLLAMA_HOST}')
+
         self._client = ollama.Client(host=f'http://{OLLAMA_HOST}:11434')
         self._shell = shell
 
+        log.info('Executing initial commands')
+        self._history = _initial_commands(shell)
+
+        log.info('Llama initialized')
+
+    @property
+    def _config(self) -> ollama.Options:
+        """Get the Llama configuration."""
         try:
             config_json = Path(CONFIG_PATH).read_text(encoding='utf-8')
         except FileNotFoundError:
             config_json = '{}'
-
         try:
-            config: ollama.Options = json.loads(config_json)
-        except json.JSONDecodeError:
-            config = {}
+            config: ollama.Options = json.loads(config_json)['LlmOptions']
+        except (json.JSONDecodeError, KeyError):
+            config: ollama.Options = {}
 
-        self._config = config | {'num_ctx': N_CTX, 'num_predict': N_CTX}
-        self._history = _initial_commands(shell)
+        ret: ollama.Options = config | CONFIG_BASE
+        return ret
 
     def prompt(self) -> LlmResponse:
         """Prompt the LLM for shell input using the command / output history."""
-        system_immutable = Path('/app/immutable/system.md').read_text(encoding='utf-8')
+        system_immutable = fd_path('system.md').read_text(encoding='utf-8')
         try:
             system_mutable = Path('system.md').read_text(encoding='utf-8')
         except FileNotFoundError:
@@ -110,6 +120,7 @@ class Llama(BaseModel):
             },
             *_from_commands(self._history),
         ]
+        log.debug(f'Prompting LLM with {len(messages)} messages')
         return cast(
             LlmResponse,
             self._client.chat(
