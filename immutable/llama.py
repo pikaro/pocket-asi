@@ -16,6 +16,9 @@ from immutable.shell import Shell
 from immutable.typedefs import CommandHistory, CommandResult, LlmResponse
 
 MODEL = 'llama3:8b'
+# MODEL = 'code-qwen-7b-gguf-q5_0:latest'      Seems to work OK, but uses lots of Markdown
+# MODEL = 'deepseek-coder-7b-gguf-q5_0:latest' Completely useless, writes blog posts
+
 N_CTX = 8192
 CONFIG_PATH = '/app/mutable/config.json'
 TOKENIZER = '/app/immutable/tokenizer.json'
@@ -59,7 +62,7 @@ def _from_commands(commands: CommandHistory) -> Sequence[ollama.Message]:
                                 ]
                             )
                             + '\n'
-                            + command['ps1']['ps1']
+                            + command['prompt']['prompt']
                         ),
                     },
                 ]
