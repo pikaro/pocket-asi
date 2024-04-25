@@ -88,7 +88,12 @@ LEXER_ERRORS: dict[type, int] = {
     ParsingError: 2,
 }
 
-GENERIC_ERRORS: dict[type, tuple[int, str]] = {}
+GENERIC_ERRORS: dict[type, tuple[int, str]] = {
+    # TODO: Make pull request to bashlex
+    # Bug in bashlex - ParsingError.__init__() missing 2 required positional arguments
+    # File "/usr/local/lib/python3.12/site-packages/bashlex/subst.py", line 284
+    TypeError: (-1, 'Internal error'),
+}
 
 
 @contextmanager
