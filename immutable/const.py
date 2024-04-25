@@ -9,4 +9,5 @@ SHELL_INTERACTIVE_COMMANDS = [
 
 CLEANUPS: list[tuple[str, str]] = [
     (r'```(python)?(.*?)```', r'\2'),
+    (r'\(Note:.*?\)', ''),
 ]
