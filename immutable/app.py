@@ -3,13 +3,24 @@
 import json
 from time import sleep
 
+import pygments.formatters
+import pygments.lexers
 from coloredlogs import logging
+from termcolor import colored
 
 from immutable.llama import Llama
 from immutable.shell import Shell
 from immutable.typedefs import CommandResult
 
 log = logging.getLogger(__name__)
+
+
+def _highlight_bash(command: str) -> str:
+    """Highlight a bash command."""
+    lexer = pygments.lexers.BashLexer()
+    formatter = pygments.formatters.TerminalFormatter()
+    # Remove the trailing newline
+    return pygments.highlight(command, lexer, formatter)[:-1]
 
 
 def _log_output(result: CommandResult) -> None:
@@ -27,15 +38,15 @@ def run() -> None:
     shell = Shell()
     llama = Llama(shell)
     log.info('Starting shell')
-    ps1 = shell.run('true')['ps1']['ps1']
-    log.info(f'Awaiting first command (PS1: {ps1})')
+    prompt = shell.run('true')['prompt']['prompt']
+    log.info(f'Awaiting first command (PS1: {prompt})')
     while True:
         response = llama.prompt()
         command = response['message']['content']
-        log.info(f'{ps1} {command}')
+        log.info(f'{colored(prompt, 'white', force_color=True)}{_highlight_bash(command)}')
 
         result = shell.run(command)
-        ps1 = result['ps1']['ps1']
+        prompt = result['prompt']['prompt']
         _log_output(result)
         llama.append(result)
 
