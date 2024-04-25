@@ -19,6 +19,9 @@ coloredlogs.install(
 )
 log = logging.getLogger(__name__)
 
+httpx_logger = logging.getLogger('httpx')
+httpx_logger.setLevel(logging.WARNING)
+
 POCKET_ASI_MODULE = os.environ['POCKET_ASI_MODULE']
 POCKET_ASI_FILES = json.loads(os.environ['POCKET_ASI_FILES'])
 log.info(f'Received {len(POCKET_ASI_FILES)} files as FDs')
