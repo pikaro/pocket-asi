@@ -1,7 +1,4 @@
 __pycache__
 a.out
 .venv
-mutable
-!mutable/system.md
-!mutable/config.json
-!mutable/app.py
+workspace
