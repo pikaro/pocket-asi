@@ -1,5 +1,12 @@
 FROM python:3.12
 
+# hadolint ignore=DL3008,DL3015,DL3009
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget
+# Deliberately not removing the lists because the models
+# don't seem to understand `apt-get update`.
+
 RUN --mount=type=bind,source=main.c,target=/main.c \
     gcc -o /main /main.c
 
