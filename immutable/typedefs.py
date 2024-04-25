@@ -5,10 +5,10 @@ from typing import Literal, TypedDict
 import ollama
 
 
-class Ps1(TypedDict):
+class Prompt(TypedDict):
     """Components of the PS1 prompt."""
 
-    ps1: str
+    prompt: str
     exit_code: int
     user: str
     host: str
@@ -26,7 +26,7 @@ class CommandResult(TypedDict):
     stdout: list[OutputLine]
     stderr: list[OutputLine]
     exit_code: int
-    ps1: Ps1
+    prompt: Prompt
 
 
 CommandHistory = list[CommandResult]
