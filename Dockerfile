@@ -15,13 +15,13 @@ RUN --mount=type=bind,source=pyproject.toml,target=/pyproject.toml \
     poetry config virtualenvs.create false && \
     poetry install --no-dev
 
-COPY ./immutable /app/immutable
+COPY ./immutable /immutable
 
 ENV PYTHONPATH=/app
 ENV PS1="\$? \\u@\\h:\\w \\$ "
 
 ENV POCKET_ASI_PYTHON=/usr/local/bin/python
-ENV POCKET_ASI_ROOT=/app/immutable
+ENV POCKET_ASI_ROOT=/immutable
 ENV POCKET_ASI_MODULE=immutable
 ENV POCKET_ASI_LOADER=loader.py
 

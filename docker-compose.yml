@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./workspace:/app/mutable
+      - ./workspace:/app
     environment:
       LOG_LEVEL: info
       OLLAMA_HOST: 192.168.64.1

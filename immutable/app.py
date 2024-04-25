@@ -76,14 +76,15 @@ def run() -> None:
 
         sleep(1)
         try:
-            import mutable.app
+            # This is mutable/main.py
+            import main  # pyright: ignore[reportMissingImports]
         except ImportError:
             _err = 'Error importing app'
             log.exception(_err)
             continue
 
         try:
-            run_result = mutable.app.run()
+            run_result = main.run()
         except Exception as exc:
             _err = f'Error running app: {exc}'
             log.exception(_err)
