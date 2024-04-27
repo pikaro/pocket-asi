@@ -1,16 +1,17 @@
 """Pretty output for the interaction."""
 
 import logging
+from typing import cast
 
 import pygments
 import pygments.formatters
 import pygments.lexers
 from pydantic import BaseModel
 
-from client.common import colored, install_coloredlogs, log_output
+from client.common import colored, log_output
 from client.const import COLORS
 from client.typedefs import CommandResult
-from server.common import env_bool, get_streaming_logger
+from server.common import env_bool
 
 log = logging.getLogger(__name__)
 
@@ -52,10 +53,13 @@ class Terminal(BaseModel):
                 log.info(comment)
         else:
             log.info(f'{prompt}{command}')
-        log_output(log, result)
+        log_output(log.info, result)
         if self._stream:
-            root_logger = logging.getLogger()
-            terminator = root_logger.handlers[0].terminator
-            root_logger.handlers[0].terminator = ''
+            # Hacky, but works - should always be the coloredlogs handler, i.e. StreamHandler
+            # Remove the newline only for this message so the command can be printed after
+            # the prompt
+            handler = cast(logging.StreamHandler, logging.getLogger().handlers[0])
+            terminator = handler.terminator
+            handler.terminator = ''
             log.info(result_prompt)
-            root_logger.handlers[0].terminator = terminator
+            handler.terminator = terminator

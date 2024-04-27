@@ -5,6 +5,7 @@ import logging
 import os
 import random
 import string
+from collections.abc import Callable
 from pathlib import Path
 
 import coloredlogs
@@ -37,14 +38,14 @@ def colored(text: str | None, color: Color) -> str:
     return termcolor.colored(text, color, force_color=True)
 
 
-def log_output(log: logging.Logger, result: CommandResult) -> None:
+def log_output(method: Callable[[str], None], result: CommandResult) -> None:
     """Log the output of a command."""
     stdout = [(*v, COLORS.stdout) for v in result.stdout]
     stderr = [(*v, COLORS.stderr) for v in result.stderr]
     for line in sorted(stdout + stderr, key=lambda x: x[0]):
-        log.info(colored(line[1].rstrip('\n'), line[-1]))
+        method(colored(line[1].rstrip('\n'), line[-1]))
     if result.exit_code:
-        log.error(f'Exited with code {result.exit_code}')
+        method(colored(f'Exited with code {result.exit_code}', COLORS.stderr))
 
 
 def install_coloredlogs(log: logging.Logger | None = None) -> None:

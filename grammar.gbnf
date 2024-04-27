@@ -20,10 +20,10 @@ comment ::= "\"comment\":" string
 #     )* "\"" ws
 # )
 
-# This allows all of ASCII printable except " and \
+# This allows all of ASCII printable except unescaped " and \
 string ::= (
     ws "\"" (
-        [ !] | [#-\[] | [\]-~]
+        [ !] | [#-\[] | [\]-~] | "\\\"" | "\\\\"
     )* "\"" ws
 )
 

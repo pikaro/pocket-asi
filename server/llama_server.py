@@ -3,7 +3,6 @@
 import json
 import logging
 import os
-import sys
 from collections.abc import Iterator
 from typing import cast
 

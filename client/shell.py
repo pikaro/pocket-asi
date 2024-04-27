@@ -59,7 +59,7 @@ def _kill_procs(procs: list[psutil.Process], kill: bool = False) -> bool:
         if alive:
             log.error(f'Failed to terminate {len(alive)}/{len(procs)} processes')
         else:
-            log.info(f'Terminated {len(gone)} processes')
+            log.debug(f'Terminated {len(gone)} processes')
         return not alive
     return True
 
@@ -350,21 +350,21 @@ class Shell(BaseModel):
         try:
             system = Path('/app/system.md').read_text('utf-8')
         except FileNotFoundError:
-            log.warning('System prompt not found')
+            log.debug('System prompt not found')
             system = None
         try:
             goal = Path('/app/goal').read_text('utf-8').strip()
         except FileNotFoundError:
-            log.warning('Goal not found')
+            log.debug('Goal not found')
             goal = None
         try:
             config_json = Path('/app/config.json').read_text('utf-8')
             config = LlamaClientConfig.model_validate_json(config_json)
         except FileNotFoundError:
-            log.warning('Config not found')
+            log.debug('Config not found')
             config = None
         except ValidationError as e:
-            log.warning(f'Invalid config: {e}')
+            log.debug(f'Invalid config: {e}')
             config = None
         return system, goal, config
 
@@ -374,7 +374,7 @@ class Shell(BaseModel):
         if invalid:
             log.error('Command refused due to syntax error')
             return invalid
-        log.info(f'Running command: {colored(command, COLORS.prompt)}')
+        log.debug(f'Running command: {colored(command, COLORS.prompt)}')
         _ = self._ensure_shell()
         if self._streams_gone():
             _err = 'Shell streams are not available'
@@ -392,7 +392,7 @@ class Shell(BaseModel):
         start = time.time()
         prompt = self._parse_prompt(self._get_prompt())
         delta = time.time() - start
-        log.info(f'Command exited with code {prompt.exit_code} in {delta:.2f}s')
+        log.debug(f'Command exited with code {prompt.exit_code} in {delta:.2f}s')
         stdout = self._get_stdout()
         stderr = self._get_stderr()
         system, goal, config = self._get_config()
@@ -406,5 +406,5 @@ class Shell(BaseModel):
             goal=goal,
             config=config,
         )
-        log_output(log, ret)
+        log_output(log.debug, ret)
         return ret
