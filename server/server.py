@@ -100,6 +100,8 @@ class Server(BaseModel):
         commands = llm_commands.commands
         for i, command in enumerate(commands):
             self._send_command(conn, command)
+            if self._terminal.stream:
+                self._terminal.render_prompt(command=command)
             result = self._read_message(conn)
             self._llama.append_command(result)
             _comment = f'{comment} ({i + 1}/{len(commands)})' if comment else None

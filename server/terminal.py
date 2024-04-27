@@ -16,8 +16,10 @@ from server.common import env_bool
 log = logging.getLogger(__name__)
 
 
-def _highlight_bash(command: str) -> str:
+def _highlight_bash(command: str | None) -> str:
     """Highlight a bash command."""
+    if command is None:
+        return ''
     lexer = pygments.lexers.BashLexer()
     formatter = pygments.formatters.TerminalFormatter()
     # Remove the trailing newline
@@ -36,30 +38,39 @@ class Terminal(BaseModel):
         self._stream = (
             not env_bool('LLAMA_STREAM_RESPONSE')
         ) and log.getEffectiveLevel() >= logging.INFO
-        log.info(f'Streaming: {self._stream}')
+        log.info(f'Streaming: {self.stream}')
+
+    @property
+    def stream(self) -> bool:
+        """Get the streaming status."""
+        return self._stream
+
+    def render_prompt(self, prompt: str | None = None, command: str | None = None) -> None:
+        """Render a prompt."""
+        prompt = colored(prompt, COLORS.prompt)
+        command = _highlight_bash(command)
+        if self.stream and not command:
+            log.info(prompt)
+        elif self.stream and not prompt:
+            print(command)
+        else:
+            log.info(f'{prompt}{command}')
 
     def render(self, prompt: str | None, result: CommandResult, comment: str | None = None) -> None:
         """Render a command result."""
-        if not prompt:
-            prompt = '<uninitialized> '
-        prompt = colored(prompt, COLORS.prompt)
-        command = _highlight_bash(result.command)
-        result_prompt = colored(result.prompt.prompt, COLORS.prompt)
-        comment = colored(comment, COLORS.comment)
         # If not streaming and not other messages, assume previous prompt is still there
-        if self._stream:
-            print(command)
-            if comment:
-                log.info(comment)
-        else:
-            log.info(f'{prompt}{command}')
+        if not self.stream:
+            self.render_prompt(prompt=prompt, command=result.command)
+        if comment:
+            comment = colored(comment, COLORS.comment)
+            log.info(comment)
         log_output(log.info, result)
-        if self._stream:
+        if self.stream:
             # Hacky, but works - should always be the coloredlogs handler, i.e. StreamHandler
             # Remove the newline only for this message so the command can be printed after
             # the prompt
             handler = cast(logging.StreamHandler, logging.getLogger().handlers[0])
             terminator = handler.terminator
             handler.terminator = ''
-            log.info(result_prompt)
+            self.render_prompt(prompt=result.prompt.prompt)
             handler.terminator = terminator

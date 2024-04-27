@@ -56,6 +56,9 @@ class LlamaServer(BaseModel):
         if context and not os.getenv('LLAMA_N_CTX'):
             log.info(f'Using model default context length: {context}')
             self._server_config.n_ctx = int(context)
+        elif not context:
+            log.warning('No context length found in metadata')
+        log.info(f'Context length: {self._server_config.n_ctx}')
 
         log.info(json.dumps(self._llm.metadata, indent=2))
         template = self._llm.metadata['tokenizer.chat_template']
