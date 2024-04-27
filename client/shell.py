@@ -10,27 +10,34 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from queue import Queue
 from select import select
-from typing import IO, cast
+from typing import IO
 
 import bashlex
 import bashlex.ast
 import bashlex.errors
 import psutil
 from bashlex.errors import ParsingError
-from bashlex.tokenizer import MatchedPairError
 from coloredlogs import logging
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from immutable.common import random_string
-from immutable.const import SHELL_INTERACTIVE_COMMANDS
-from immutable.typedefs import CommandResult, OutputLine, Prompt
+from client.common import colored, log_output, random_string
+from client.const import (
+    COLORS,
+    EXIT_TIMEOUT,
+    GENERIC_ERRORS,
+    KILL_TIMEOUT,
+    LEXER_ERRORS,
+    SHELL_INTERACTIVE_COMMANDS,
+    USERTYPES,
+)
+from client.typedefs import CommandResult, LlamaClientConfig, OutputLine, Prompt
 
 log = logging.getLogger(__name__)
 
 
 def _dummy_out(message: str) -> list[OutputLine]:
     """Dummy output function."""
-    return [(time.time(), message)]
+    return [(time.time(), f'/bin/bash: {message}')]
 
 
 def _enqueue_output(out: IO, queue: Queue[OutputLine]) -> None:
@@ -78,22 +85,6 @@ def _get_commands(command: str) -> list[str]:
         visitor.visit(elem)
 
     return [v.parts[0].word for v in commands]
-
-
-EXIT_TIMEOUT = 10.0
-KILL_TIMEOUT = 1.0
-
-LEXER_ERRORS: dict[type, int] = {
-    MatchedPairError: 2,
-    ParsingError: 2,
-}
-
-GENERIC_ERRORS: dict[type, tuple[int, str]] = {
-    # TODO: Make pull request to bashlex
-    # Bug in bashlex - ParsingError.__init__() missing 2 required positional arguments
-    # File "/usr/local/lib/python3.12/site-packages/bashlex/subst.py", line 284
-    TypeError: (-1, 'Internal error'),
-}
 
 
 @contextmanager
@@ -157,13 +148,21 @@ class Shell(BaseModel):
         stderr: str | None = None,
     ) -> CommandResult:
         """Dummy result function."""
+        log.debug(
+            f'Dummy result for command: {colored(command, COLORS.prompt)}'
+            f' with exit code {exit_code}'
+        )
         prompt = self._parse_prompt(self._get_prompt())
+        system, goal, config = self._get_config()
         return CommandResult(
             command=command,
             stdout=_dummy_out(stdout) if stdout else [],
             stderr=_dummy_out(stderr) if stderr else [],
             exit_code=exit_code,
             prompt=prompt,
+            system=system,
+            goal=goal,
+            config=config,
         )
 
     def _lex(self, command: str) -> None | CommandResult:
@@ -188,8 +187,8 @@ class Shell(BaseModel):
         commands = _get_commands(command)
         interactive = ', '.join(set(commands) & set(SHELL_INTERACTIVE_COMMANDS))
         if interactive:
-            _err = f'This is not an interactive shell, refusing to run: {interactive}'
-            return self._dummy_result(command, -1, stderr=_err)
+            _err = f'Not a terminal: {interactive}'
+            return self._dummy_result(command, -3, stderr=_err)
 
         return None
 
@@ -204,16 +203,15 @@ class Shell(BaseModel):
             _err = f'Prompt does not match expected format: {prompt}'
             raise ValueError(_err)
         groups = match.groupdict()
-        return cast(
-            Prompt,
+        return Prompt.model_validate(
             {
                 'prompt': prompt,
                 'exit_code': int(groups['exit_code']),
                 'user': groups['user'],
                 'host': groups['host'],
                 'cwd': groups['cwd'],
-                'usertype': groups['usertype'],
-            },
+                'usertype': USERTYPES[groups['usertype']],
+            }
         )
 
     def _open_shell(self):
@@ -319,19 +317,18 @@ class Shell(BaseModel):
         try:
             if not self._ensure_shell():
                 prompt = self._parse_prompt(self._get_prompt())
-                return prompt['prompt']
+                return prompt.prompt
 
             log.debug(f'Waiting for shell to finish in {EXIT_TIMEOUT} seconds')
             ready, _, _ = select([fd], [], [], EXIT_TIMEOUT)
 
             if not ready:
                 log.error('Shell did not finish in time')
-                gone = self._kill_shell_children()
-                if not gone:
+                if not self._kill_shell_children():
+                    log.error('Failed to terminate shell children')
                     _ = self._kill_shell_children(kill=True)
-                log.error(f'Remaining stdout: {self._get_stdout()}')
-                log.error(f'Remaining stderr: {self._get_stderr()}')
-                return self._get_prompt()
+                ret = self._dummy_result('', -2, stderr='Command timed out')
+                return ret.prompt.prompt
             return os.read(fd, 1024).decode('utf-8')
         finally:
             os.close(fd)
@@ -344,31 +341,70 @@ class Shell(BaseModel):
             self._put_stdin(
                 f'(R="$?"; PS1="{ps1}"; (exit "$R"); echo -n "${{PS1@P}}" >> {fifo}; exit "$R")'
             )
-            return self._wait_done(fifo)
+            ret = self._wait_done(fifo)
+            log.debug(f'Got prompt: {ret}')
+            return ret
 
-    def run(self, command: str) -> CommandResult:
+    def _get_config(self) -> tuple[str | None, str | None, LlamaClientConfig | None]:
+        """Get the system, goal, and config."""
+        try:
+            system = Path('/app/system.md').read_text('utf-8')
+        except FileNotFoundError:
+            log.warning('System prompt not found')
+            system = None
+        try:
+            goal = Path('/app/goal').read_text('utf-8').strip()
+        except FileNotFoundError:
+            log.warning('Goal not found')
+            goal = None
+        try:
+            config_json = Path('/app/config.json').read_text('utf-8')
+            config = LlamaClientConfig.model_validate_json(config_json)
+        except FileNotFoundError:
+            log.warning('Config not found')
+            config = None
+        except ValidationError as e:
+            log.warning(f'Invalid config: {e}')
+            config = None
+        return system, goal, config
+
+    def execute(self, command: str) -> CommandResult:
         """Run a command in the shell."""
         invalid = self._lex(command)
         if invalid:
             log.error('Command refused due to syntax error')
             return invalid
-        log.debug(f'Running command: {command}')
+        log.info(f'Running command: {colored(command, COLORS.prompt)}')
         _ = self._ensure_shell()
         if self._streams_gone():
             _err = 'Shell streams are not available'
             raise ValueError(_err)
+
         if self._get_shell_children():
-            _err = 'Shell still has old children'
-            raise ValueError(_err)
+            # Can happen if the model starts background processes
+            # TODO: Allow background processes?
+            log.error('Shell still has old children')
+            if not self._kill_shell_children():
+                log.error('Failed to terminate old shell children')
+                _ = self._kill_shell_children(kill=True)
+
         self._put_stdin(command)
+        start = time.time()
         prompt = self._parse_prompt(self._get_prompt())
-        log.debug(f'Command exited with code {prompt["exit_code"]}')
+        delta = time.time() - start
+        log.info(f'Command exited with code {prompt.exit_code} in {delta:.2f}s')
         stdout = self._get_stdout()
         stderr = self._get_stderr()
-        return CommandResult(
+        system, goal, config = self._get_config()
+        ret = CommandResult(
             command=command,
             stdout=stdout,
             stderr=stderr,
-            exit_code=prompt['exit_code'],
+            exit_code=prompt.exit_code,
             prompt=prompt,
+            system=system,
+            goal=goal,
+            config=config,
         )
+        log_output(log, ret)
+        return ret

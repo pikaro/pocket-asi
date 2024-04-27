@@ -1,0 +1,30 @@
+root ::= response
+
+response ::= (
+    "{" ws
+        commands ws
+        ("," ws comment ws)?
+    "}"
+)
+
+commands ::= "\"commands\":" commandlist
+commandlist ::= "[" string ("," string)* "]"
+comment ::= "\"comment\":" string
+
+# Too permissive - models start printing Chinese / Cyrillic
+# Not sure if they actually use nonprintable
+# string ::= (
+#     ws "\"" (
+#         [^"\\\x7F\x00-\x1F] |
+#         "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+#     )* "\"" ws
+# )
+
+# This allows all of ASCII printable except " and \
+string ::= (
+    ws "\"" (
+        [ !] | [#-\[] | [\]-~]
+    )* "\"" ws
+)
+
+ws ::= [ \t\n]*

@@ -1,10 +1,9 @@
 services:
-  system:
+  client:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.client
     volumes:
       - ./workspace:/app
     environment:
-      LOG_LEVEL: info
-      OLLAMA_HOST: 192.168.64.1
+      LOG_LEVEL: "${LOG_LEVEL}"

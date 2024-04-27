@@ -92,7 +92,7 @@ class FDFinder(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, FDFinder())
 
-from immutable.app import run  # noqa: E402
+from client.app import run  # noqa: E402
 
 log.info('Loaded application from file descriptors')
 

@@ -1,3 +1,5 @@
+*.gguf
+.env
 __pycache__
 a.out
 .venv
