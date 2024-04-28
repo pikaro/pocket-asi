@@ -28,12 +28,14 @@ comment ::= "\"comment\":" string
 #     )* "\"" ws
 # )
 
-# This allows all of ASCII printable except unescaped " and \
-# ` is prohibited entirely so the models don't use Markdown
+# \ is only permitted for \[fnt]
+# " is prohibited because it leads to nested JSON
+# ` is prohibited so the models don't use Markdown
 string ::= (
     ws "\"" (
-        [ !] | [#-\[] | [\]-_] | [a-~] | "\\\"" | "\\\\"
+        [ !] | [#-\[] | [\]-_] | [a-~] | escape
     )* "\"" ws
 )
 
+escape ::= "\\" [fnt]
 ws ::= [ \t\n]*
