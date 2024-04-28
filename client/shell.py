@@ -10,7 +10,7 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from queue import Queue
 from select import select
-from typing import IO
+from typing import IO, overload
 
 import bashlex
 import bashlex.ast
@@ -30,7 +30,20 @@ from client.const import (
     SHELL_INTERACTIVE_COMMANDS,
     USERTYPES,
 )
-from client.typedefs import CommandResult, LlamaClientConfig, OutputLine, Prompt
+from client.typedefs import (
+    AnyCommand,
+    AnyResult,
+    BaseResult,
+    FileReadCommand,
+    FileReadResult,
+    FileWriteCommand,
+    FileWriteResult,
+    LlamaClientConfig,
+    OutputLine,
+    Prompt,
+    ShellCommand,
+    ShellResult,
+)
 
 log = logging.getLogger(__name__)
 
@@ -146,7 +159,7 @@ class Shell(BaseModel):
         exit_code: int,
         stdout: str | None = None,
         stderr: str | None = None,
-    ) -> CommandResult:
+    ) -> ShellResult:
         """Dummy result function."""
         log.debug(
             f'Dummy result for command: {colored(command, COLORS.prompt)}'
@@ -154,8 +167,8 @@ class Shell(BaseModel):
         )
         prompt = self._parse_prompt(self._get_prompt())
         system, goal, config = self._get_config()
-        return CommandResult(
-            command=command,
+        return ShellResult(
+            command=ShellCommand(command=command),
             stdout=_dummy_out(stdout) if stdout else [],
             stderr=_dummy_out(stderr) if stderr else [],
             exit_code=exit_code,
@@ -165,7 +178,7 @@ class Shell(BaseModel):
             config=config,
         )
 
-    def _lex(self, command: str) -> None | CommandResult:
+    def _lex(self, command: str) -> None | ShellResult:
         """Lex a command."""
         if re.sub(r'^#.*', '', command).strip() == '':
             return self._dummy_result(command, 0)
@@ -368,13 +381,17 @@ class Shell(BaseModel):
             config = None
         return system, goal, config
 
-    def execute(self, command: str) -> CommandResult:
-        """Run a command in the shell."""
-        invalid = self._lex(command)
+    def _get_base(self) -> BaseResult:
+        """Get the base result."""
+        system, goal, config = self._get_config()
+        return BaseResult(system=system, goal=goal, config=config)
+
+    def _execute_shell(self, command: ShellCommand) -> ShellResult:
+        invalid = self._lex(command.command)
         if invalid:
             log.error('Command refused due to syntax error')
             return invalid
-        log.debug(f'Running command: {colored(command, COLORS.prompt)}')
+        log.debug(f'Running command: {colored(command.command, COLORS.prompt)}')
         _ = self._ensure_shell()
         if self._streams_gone():
             _err = 'Shell streams are not available'
@@ -388,23 +405,79 @@ class Shell(BaseModel):
                 log.error('Failed to terminate old shell children')
                 _ = self._kill_shell_children(kill=True)
 
-        self._put_stdin(command)
+        self._put_stdin(command.command)
         start = time.time()
         prompt = self._parse_prompt(self._get_prompt())
         delta = time.time() - start
         log.debug(f'Command exited with code {prompt.exit_code} in {delta:.2f}s')
         stdout = self._get_stdout()
         stderr = self._get_stderr()
-        system, goal, config = self._get_config()
-        ret = CommandResult(
+        ret = ShellResult(
             command=command,
             stdout=stdout,
             stderr=stderr,
             exit_code=prompt.exit_code,
             prompt=prompt,
-            system=system,
-            goal=goal,
-            config=config,
+            **self._get_base().model_dump(),
         )
         log_output(log.debug, ret)
         return ret
+
+    def _execute_file_read(self, command: FileReadCommand) -> FileReadResult:
+        log.debug(f'Reading file: {colored(command.file, COLORS.prompt)}')
+        try:
+            content = Path(command.file).read_text('utf-8')
+            log.debug(f'File content: {content}')
+            return FileReadResult(
+                command=command,
+                file=command.file,
+                content=content,
+                **self._get_base().model_dump(),
+            )
+        except FileNotFoundError:
+            log.debug(f'File not found: {command.file}')
+            return FileReadResult(
+                command=command,
+                file=command.file,
+                error='File not found',
+                **self._get_base().model_dump(),
+            )
+
+    def _execute_file_write(self, command: FileWriteCommand) -> FileWriteResult:
+        log.debug(f'Writing file: {colored(command.file, COLORS.prompt)}')
+        try:
+            _ = Path(command.file).write_text(command.content, 'utf-8')
+            return FileWriteResult(
+                command=command,
+                file=command.file,
+                written=len(command.content),
+                **self._get_base().model_dump(),
+            )
+        except Exception as e:
+            log.debug(f'Failed to write file: {e}')
+            return FileWriteResult(
+                command=command,
+                file=command.file,
+                error=str(e),
+                **self._get_base().model_dump(),
+            )
+
+    @overload
+    def execute(self, command: ShellCommand) -> ShellResult: ...
+
+    @overload
+    def execute(self, command: FileReadCommand) -> FileReadResult: ...
+
+    @overload
+    def execute(self, command: FileWriteCommand) -> FileWriteResult: ...
+
+    def execute(self, command: AnyCommand) -> AnyResult:
+        """Execute a command."""
+        if isinstance(command, ShellCommand):
+            return self._execute_shell(command)
+        if isinstance(command, FileReadCommand):
+            return self._execute_file_read(command)
+        if isinstance(command, FileWriteCommand):
+            return self._execute_file_write(command)
+        _err = f'Invalid command type: {type(command)}'
+        raise ValueError(_err)

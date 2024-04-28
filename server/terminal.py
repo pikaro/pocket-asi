@@ -10,7 +10,14 @@ from pydantic import BaseModel
 
 from client.common import colored, log_output
 from client.const import COLORS
-from client.typedefs import CommandResult
+from client.typedefs import (
+    AnyCommand,
+    AnyResult,
+    FileReadCommand,
+    FileWriteCommand,
+    ShellCommand,
+    ShellResult,
+)
 from server.common import env_bool
 
 log = logging.getLogger(__name__)
@@ -45,18 +52,25 @@ class Terminal(BaseModel):
         """Get the streaming status."""
         return self._stream
 
-    def render_prompt(self, prompt: str | None = None, command: str | None = None) -> None:
+    def render_prompt(self, prompt: str | None = None, command: AnyCommand | None = None) -> None:
         """Render a prompt."""
         prompt = colored(prompt, COLORS.prompt)
-        command = _highlight_bash(command)
+        command_text = ''
+        if isinstance(command, ShellCommand):
+            command_text = _highlight_bash(command.command)
+        elif isinstance(command, FileReadCommand):
+            command_text = colored(f'read({command.file})', COLORS.command)
+        elif isinstance(command, FileWriteCommand):
+            count = len(command.content)
+            command_text = colored(f'write({command.file}, {count} bytes)', COLORS.command)
         if self.stream and not command:
             log.info(prompt)
         elif self.stream and not prompt:
-            print(command)
+            print(command_text)
         else:
-            log.info(f'{prompt}{command}')
+            log.info(f'{prompt}{command_text}')
 
-    def render(self, prompt: str | None, result: CommandResult, comment: str | None = None) -> None:
+    def render(self, prompt: str | None, result: AnyResult, comment: str | None = None) -> None:
         """Render a command result."""
         # If not streaming and not other messages, assume previous prompt is still there
         if not self.stream:
@@ -72,5 +86,7 @@ class Terminal(BaseModel):
             handler = cast(logging.StreamHandler, logging.getLogger().handlers[0])
             terminator = handler.terminator
             handler.terminator = ''
-            self.render_prompt(prompt=result.prompt.prompt)
+            if isinstance(result, ShellResult):
+                prompt = result.prompt.prompt
+            self.render_prompt(prompt=prompt)
             handler.terminator = terminator

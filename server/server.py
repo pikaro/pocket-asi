@@ -2,12 +2,19 @@
 
 import logging
 import os
+from contextlib import suppress
 from socket import AF_INET, SOCK_STREAM, socket
 
 from pydantic import BaseModel, ValidationError
 
 from client.const import EXIT_TIMEOUT
-from client.typedefs import CommandResult
+from client.typedefs import (
+    AnyCommand,
+    AnyResult,
+    FileReadResult,
+    FileWriteResult,
+    ShellResult,
+)
 from server.const import INITIAL_COMMANDS
 from server.llama_chat import LlamaChat
 from server.terminal import Terminal
@@ -62,7 +69,7 @@ class Server(BaseModel):
             while True:
                 try:
                     commands = self._llama.get_commands()
-                except ValidationError:
+                except ValueError:
                     continue
                 try:
                     self._send_commands(conn, commands)
@@ -73,11 +80,27 @@ class Server(BaseModel):
     def _initial_commands(self, conn: socket):
         """Run initial commands."""
         if not self._initialized:
-            commands = LlmCommands(commands=INITIAL_COMMANDS, comment='Initial commands')
-            self._send_commands(conn, commands)
+            self._send_commands(conn, INITIAL_COMMANDS)
             self._initialized = True
 
-    def _read_message(self, conn: socket) -> CommandResult:
+    def _determine_result(self, result: str) -> AnyResult:
+        """Determine the type of result."""
+        ret = None
+        with suppress(ValidationError):
+            ret = ShellResult.model_validate_json(result)
+            log.debug(f'Result is a ShellResult: {ret}')
+        with suppress(ValidationError):
+            ret = FileReadResult.model_validate_json(result)
+            log.debug(f'Result is a FileReadResult: {ret}')
+        with suppress(ValidationError):
+            ret = FileWriteResult.model_validate_json(result)
+            log.debug(f'Result is a FileWriteResult: {ret}')
+        if ret:
+            return ret
+        _err = f'Invalid result: {result}'
+        raise ValueError(_err)
+
+    def _read_message(self, conn: socket) -> AnyResult:
         """Read a message from the connection."""
         while True:
             data = conn.recv(4096)
@@ -88,7 +111,7 @@ class Server(BaseModel):
             if b'\0' in self._data:
                 message, self._data = self._data.split(b'\0', 1)
                 result_json = message.decode('utf-8')
-                return CommandResult.model_validate_json(result_json)
+                return self._determine_result(result_json)
 
     def _send_commands(
         self,
@@ -96,18 +119,17 @@ class Server(BaseModel):
         llm_commands: LlmCommands,
     ) -> None:
         """Send commands to the connection."""
-        comment = llm_commands.comment
-        commands = llm_commands.commands
-        for i, command in enumerate(commands):
+        for command in llm_commands:
             self._send_command(conn, command)
             if self._terminal.stream:
                 self._terminal.render_prompt(command=command)
             result = self._read_message(conn)
             self._llama.append_command(result)
-            _comment = f'{comment} ({i + 1}/{len(commands)})' if comment else None
-            self._terminal.render(self._prompt, result, _comment)
-            self._prompt = result.prompt.prompt
+            log.debug(f'Rendering result: {result}')
+            self._terminal.render(self._prompt, result, command.comment)
+            if isinstance(result, ShellResult):
+                self._prompt = result.prompt.prompt
 
-    def _send_command(self, conn: socket, command: str):
+    def _send_command(self, conn: socket, command: AnyCommand):
         """Send a command to the connection."""
-        conn.sendall(f'{command}\0'.encode())
+        conn.sendall(f'{command.model_dump_json()}\0'.encode())

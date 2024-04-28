@@ -4,7 +4,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from client.typedefs import CommandResult, LlamaClientConfig
+from client.typedefs import AnyCommand, AnyResult, LlamaClientConfig
 
 
 class LlamaServerConfig(BaseModel):
@@ -17,20 +17,35 @@ class LlamaServerConfig(BaseModel):
 ConfigT = TypeVar('ConfigT', LlamaServerConfig, LlamaClientConfig)
 
 
-class SimpleCommandResult(BaseModel):
+class SimpleShellResult(BaseModel):
     """Result of a command execution as expected by the LLM."""
 
     prompt: str
+    command: str
     stdout: str | None = None
     stderr: str | None = None
     exit_code: int | None = None
 
 
-CommandHistory = list[CommandResult]
+class SimpleFileReadResult(BaseModel):
+    """Result of a file read operation as expected by the LLM."""
+
+    file: str
+    content: str | None = None
+    error: str | None = None
 
 
-class LlmCommands(BaseModel):
-    """Commands to be executed by the LLM server."""
+class SimpleFileWriteResult(BaseModel):
+    """Result of a file write operation as expected by the LLM."""
 
-    commands: list[str]
-    comment: str | None = None
+    file: str
+    content: str
+    written: int | None = None
+    error: str | None = None
+
+
+SimpleAnyResult = SimpleShellResult | SimpleFileReadResult | SimpleFileWriteResult
+ResultHistory = list[AnyResult]
+
+
+LlmCommands = list[AnyCommand]

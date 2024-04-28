@@ -6,8 +6,9 @@ from socket import AF_INET, SOCK_STREAM, socket
 
 from pydantic import BaseModel
 
+from client.common import determine_command
 from client.shell import Shell
-from client.typedefs import CommandResult
+from client.typedefs import AnyResult
 
 log = logging.getLogger(__name__)
 
@@ -39,8 +40,7 @@ class Client(BaseModel):
     def _handle_commands(self, sock: socket) -> None:
         """Handle commands from the server."""
         while True:
-            command = self._read_command(sock)
-            log.debug(f'Received command: {command}')
+            command = determine_command(self._read_command(sock), log_method=log.debug)
             result = self._shell.execute(command)
             log.debug(f'Sending result: {result}')
             self._send_result(sock, result)
@@ -56,6 +56,6 @@ class Client(BaseModel):
                 message, self._data = self._data.split(b'\0', 1)
                 return message.decode('utf-8')
 
-    def _send_result(self, sock: socket, message: CommandResult) -> None:
+    def _send_result(self, sock: socket, message: AnyResult) -> None:
         """Send a result to the server."""
         sock.sendall(message.model_dump_json().encode('utf-8') + b'\0')

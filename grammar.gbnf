@@ -1,14 +1,22 @@
-root ::= response
+root ::= actionlist
 
-response ::= (
+actionlist ::= "[" ws action ws ("," ws action)* ws "]"
+
+action ::= (
     "{" ws
-        commands ws
-        ("," ws comment ws)?
+        (command | file)
+        ("," ws comment)?
     "}"
 )
 
-commands ::= "\"commands\":" commandlist
-commandlist ::= "[" string ("," string)* "]"
+command ::= "\"command\"" ws ":" string
+
+file ::= (
+        "\"file\"" ws ":" string
+        ("," ws content)?
+)
+
+content ::= "\"content\":" string
 comment ::= "\"comment\":" string
 
 # Too permissive - models start printing Chinese / Cyrillic

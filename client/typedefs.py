@@ -26,17 +26,71 @@ class LlamaClientConfig(BaseModel):
     temperature: float | None = None
 
 
-class CommandResult(BaseModel):
-    """Result of a command execution."""
+class BaseCommand(BaseModel):
+    """Base command for all commands."""
+
+    comment: str | None = None
+
+
+class ShellCommand(BaseCommand):
+    """A shell command to execute."""
 
     command: str
-    stdout: list[OutputLine]
-    stderr: list[OutputLine]
-    exit_code: int
-    prompt: Prompt
+
+
+class FileReadCommand(BaseCommand):
+    """A file read command."""
+
+    file: str
+
+
+class FileWriteCommand(BaseCommand):
+    """A file write command."""
+
+    file: str
+    content: str
+
+
+AnyCommand = ShellCommand | FileReadCommand | FileWriteCommand
+
+
+class BaseResult(BaseModel):
+    """Base result for all commands."""
+
     config: LlamaClientConfig | None
     system: str | None
     goal: str | None
+
+
+class ShellResult(BaseResult):
+    """Result of a command execution."""
+
+    command: ShellCommand
+    prompt: Prompt
+    stdout: list[OutputLine]
+    stderr: list[OutputLine]
+    exit_code: int
+
+
+class FileWriteResult(BaseResult):
+    """Result of a file write operation."""
+
+    command: FileWriteCommand
+    file: str
+    error: str | None = None
+    written: int | None = None
+
+
+class FileReadResult(BaseResult):
+    """Result of a file read operation."""
+
+    command: FileReadCommand
+    file: str
+    content: str | None = None
+    error: str | None = None
+
+
+AnyResult = ShellResult | FileReadResult | FileWriteResult
 
 
 class TerminalColors(BaseModel):
@@ -47,3 +101,4 @@ class TerminalColors(BaseModel):
     stderr: Color
     comment: Color
     stream: Color
+    command: Color

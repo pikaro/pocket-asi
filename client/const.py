@@ -47,4 +47,5 @@ COLORS = TerminalColors(
     stderr='red',
     comment='cyan',
     stream='green',
+    command='yellow',
 )

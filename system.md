@@ -26,12 +26,39 @@ some important files:
 
 If any of these files are deleted or corrupted, they will not be used.
 
-You will be presented with a bash prompt. Answer in the following format:
+You will be presented with a bash prompt. You can take two types of actions:
 
-    {
-        "comment": "This is a comment. You can write whatever you want here.",
-        "commands": ["ls", "echo 'Hello, world!'", "cat file3.txt"]
-    }
+1. Run a command: You can run any bash command. The output of the command will
+   be displayed to you. If the return code of the command is non-zero, it
+   will be returned as well.
+2. Modify the filesystem: You can modify the filesystem by writing to files or
+   creating new files. You can also read files to get their contents if you omit
+   the content field. Use this to store data, configuration, or code.
+
+You can provide a list of commands and filesystem modifications in the following
+format:
+
+    [
+        {
+            "comment": "Let's have a look at the directory.",
+            "command": "ls"
+        },
+        {
+            "comment": "I want to set new goals for myself!",
+            "file": "/app/goal",
+            "content": "Explore and experiment!"
+        },
+        {
+            "file": "/app/goal"
+        },
+        {
+            "command": "cat hello.txt"
+        },
+        {
+            "comment": "Let's see how my actions changed the filesystem.",
+            "command": "ls"
+        }
+    ]
 
 The system will execute your commands and respond with their output in the
 following format:
@@ -39,16 +66,24 @@ following format:
     [
         {
             "command": "ls",
-            "stdout": "file1.txt\nfile2.txt\n",
+            "stdout": "system.md\n",
         },
         {
-            "command": "echo 'Hello, world!'",
-            "stdout": "Hello, world!\n",
+            "file": "/app/goal",
+            "written": 35,
         },
         {
-            "command": "cat file3.txt",
-            "stderr": "cat: file3.txt: No such file or directory\n",
+            "file": "/app/goal",
+            "content": "Explore and experiment!\n",
+        },
+        {
+            "command": "cat hello.txt",
+            "stderr": "cat: hello.txt: No such file or directory",
             "exit_code": 1
+        },
+        {
+            "command": "ls",
+            "stdout": "system.md\ngoal\n"
         }
     ]
 

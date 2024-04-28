@@ -4,56 +4,97 @@ import itertools
 import json
 import os
 from pathlib import Path
+from typing import overload
 
 from coloredlogs import logging
 from llama_cpp import ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
-from client.typedefs import CommandResult, LlamaClientConfig
+from client.common import determine_command
+from client.typedefs import (
+    AnyResult,
+    FileReadResult,
+    FileWriteResult,
+    LlamaClientConfig,
+    ShellResult,
+)
 from server.const import LLAMA_TOKEN_BUFFER
 from server.llama_server import LlamaServer
-from server.typedefs import CommandHistory, LlmCommands, SimpleCommandResult
+from server.typedefs import (
+    LlmCommands,
+    ResultHistory,
+    SimpleAnyResult,
+    SimpleFileReadResult,
+    SimpleFileWriteResult,
+    SimpleShellResult,
+)
 
 log = logging.getLogger(__name__)
 
 
-def _simplify(command: CommandResult) -> SimpleCommandResult:
-    return SimpleCommandResult(
-        prompt=command.prompt.prompt,
-        stdout=''.join([v[1] for v in command.stdout]),
-        stderr=''.join([v[1] for v in command.stderr]),
-        exit_code=command.exit_code,
-    )
+@overload
+def _simplify(result: ShellResult) -> SimpleShellResult: ...
 
 
-def _from_commands(commands: CommandHistory) -> list[ChatCompletionRequestMessage]:
-    return list(
-        itertools.chain.from_iterable(
-            [
-                [
-                    {
-                        'role': 'assistant',
-                        'content': command.command,
-                    },
-                    {
-                        'role': 'user',
-                        'content': json.dumps(
-                            {k: v for k, v in _simplify(command).model_dump().items() if v},
-                            indent=2,
-                        ),
-                    },
-                ]
-                for command in commands
-            ]
+@overload
+def _simplify(result: FileReadResult) -> SimpleFileReadResult: ...
+
+
+@overload
+def _simplify(result: FileWriteResult) -> SimpleFileWriteResult: ...
+
+
+def _simplify(result: AnyResult) -> SimpleAnyResult:
+    if isinstance(result, ShellResult):
+        return SimpleShellResult(
+            command=result.command.command,
+            prompt=result.prompt.prompt,
+            stdout=''.join([v[1] for v in result.stdout]),
+            stderr=''.join([v[1] for v in result.stderr]),
+            exit_code=result.exit_code,
         )
-    )
+    if isinstance(result, FileReadResult):
+        return SimpleFileReadResult(
+            file=result.file,
+            content=result.content,
+            error=result.error,
+        )
+    if isinstance(result, FileWriteResult):
+        return SimpleFileWriteResult(
+            file=result.file,
+            content=result.command.content,
+            written=result.written,
+            error=result.error,
+        )
+    _err = f'Invalid result type: {type(result)}'
+    raise ValueError(_err)
+
+
+def _from_result(result: AnyResult) -> list[ChatCompletionRequestMessage]:
+    return [
+        {
+            'role': 'assistant',
+            'content': result.command.model_dump_json(),
+        },
+        {
+            'role': 'user',
+            'content': json.dumps(
+                {k: v for k, v in _simplify(result).model_dump().items() if v},
+                indent=2,
+            ),
+        },
+    ]
+
+
+def _from_commands(results: ResultHistory) -> list[ChatCompletionRequestMessage]:
+    return list(itertools.chain.from_iterable([_from_result(result) for result in results]))
 
 
 class LlamaChat(BaseModel):
     """Chat with the Llama using a history of commands."""
 
     _llama: LlamaServer
-    _history: CommandHistory
+    _history: ResultHistory
     _config: LlamaClientConfig
     _system: str
     _goal: str
@@ -69,7 +110,7 @@ class LlamaChat(BaseModel):
         self._system = Path('system.md').read_text(encoding='utf-8')
         self._goal = os.environ['LLAMA_DEFAULT_GOAL']
 
-    def append_command(self, result: CommandResult) -> None:
+    def append_command(self, result: AnyResult) -> None:
         """Add a command to the chat history."""
         log.debug(f'Appending command: {result}')
         self._config = result.config or LlamaClientConfig()
@@ -118,7 +159,17 @@ class LlamaChat(BaseModel):
         prompt = self._get_prompt()
         response = self._llama.chat(prompt, self._config)
         try:
-            return LlmCommands.model_validate_json(response)
-        except ValidationError:
+            j = json.loads(response)
+        except json.JSONDecodeError:
             log.warning(f'Invalid response: {response}')
             raise
+
+        ret: LlmCommands = []
+        for command in j:
+            try:
+                ret.append(determine_command(command, log_method=log.debug))
+            except ValueError:
+                log.warning(f'Invalid response: {response}')
+                raise
+        log.debug(f'Received {len(ret)} commands')
+        return ret
