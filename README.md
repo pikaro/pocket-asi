@@ -2,13 +2,17 @@
 
 ## Purpose
 
-`pocket-ASI` is a shell simulator for Large Language Models based on
+`pocket-ASI` is a **shell simulator for Large Language Models** based on
 `[llama-cpp-python](https://github.com/abetlen/llama-cpp-python)`.
 
 It exposes a bash shell in a Docker container directly to the LLM, allowing it
-to execute arbitrary commands and interact with the filesystem. The LLM server
-process runs on the host and communicates with the Docker container over a
-network socket.
+to execute **arbitrary commands** and interact with the filesystem.
+
+The model can configure all of its **own generation parameters, its primary
+goal, and the system prompt** and instructions.
+
+The LLM server process runs on the host and communicates with the Docker
+container over a network socket.
 
 [![asciicast](.assets/screenshot.png)](https://asciinema.org/a/xhIMp7ohiJUQ9vA2OM5uDA5Dv)
 
@@ -24,10 +28,6 @@ Configuration is found in `.env`. To run the application, you only need to
 provide a GGUF model path. CodeQwen 1.5 seems to work fairly well.
 
 ## Configuration
-
-The model can configure all of its own generation parameters, its primary goal,
-and the system prompt and instructions. When it deletes these settings, defaults
-will be used.
 
 All model parameters of `llama-cpp-python` and the defaults for generation are
 exposed as env variables and can be configured in `.env`. Prefix the variable
