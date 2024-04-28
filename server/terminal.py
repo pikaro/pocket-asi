@@ -38,6 +38,7 @@ class Terminal(BaseModel):
     suspended: bool = False
     _stream: bool
     _streamer: logging.Logger
+    _have_prompt: bool = False
 
     def __init__(self, stream: bool):
         """Initialize the terminal."""
@@ -65,10 +66,11 @@ class Terminal(BaseModel):
             command_text = colored(f'write({command.file}, {count} bytes)', COLORS.command)
         if self.stream and not command:
             log.info(prompt)
-        elif self.stream and not prompt:
+        elif self.stream and not prompt and self._have_prompt:
             print(command_text)
         else:
             log.info(f'{prompt}{command_text}')
+        self._have_prompt = True
 
     def render(self, prompt: str | None, result: AnyResult, comment: str | None = None) -> None:
         """Render a command result."""
