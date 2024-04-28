@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 from collections.abc import Iterator
 from typing import cast
 
@@ -16,15 +15,20 @@ from llama_cpp import (
 )
 from llama_cpp.llama_chat_format import Jinja2ChatFormatter
 from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 
 from client.typedefs import LlamaClientConfig
-from server.common import env_bool, get_streaming_logger
-from server.const import LLAMA_CLIENT_DEFAULTS, LLAMA_SERVER_DEFAULTS
-from server.typedefs import ConfigT, LlamaServerConfig
+from server.common import get_streaming_logger
+from server.typedefs import LlamaServerConfig
 
 log = logging.getLogger(__name__)
 
-STREAM_RESPONSE = env_bool('LLAMA_STREAM_RESPONSE')
+
+def _config_params(model: BaseSettings) -> dict[str, Any]:
+    ret = {k: v for k, v in model.model_dump().items() if v is not None}
+    for k, v in ret.items():
+        log.debug(f'{model.__class__.__name__}.{k}: {v}')
+    return ret
 
 
 class LlamaServer(BaseModel):
@@ -32,35 +36,27 @@ class LlamaServer(BaseModel):
 
     _llm: Llama
     _grammar: LlamaGrammar
-    _server_config: LlamaServerConfig
-    _client_config: LlamaClientConfig
+    server_config: LlamaServerConfig
+    client_config: LlamaClientConfig
     _formatter: Jinja2ChatFormatter
     _streamer: logging.Logger
 
-    def __init__(self):
+    class Config:
+        """Pydantic config."""
+
+        arbitrary_types_allowed = True
+
+    def __init__(self, *args, **kwargs):
         """Initialize the Llama server."""
-        super().__init__()
-        self._configure()
+        super().__init__(*args, **kwargs)
         self._grammar = LlamaGrammar.from_file('grammar.gbnf')
-        self._llm = Llama(
-            model_path=os.environ['LLAMA_MODEL_PATH'],
-            n_gpu_layers=-1,
-            n_ctx=self._server_config.n_ctx,
-            verbose=env_bool('LLAMA_VERBOSE'),
-        )
+        self._llm = Llama(**_config_params(self.server_config))
+
         context = self._llm.metadata.get('llama.context_length')
+        if context and self.server_config.n_ctx > int(context):
+            log.critical(f'Context lengthl {self.server_config.n_ctx} exceeds metadata {context}')
 
-        if context and self._server_config.n_ctx > int(context):
-            log.critical(f'Context lengthl {self._server_config.n_ctx} exceeds {context}')
-
-        if context and not os.getenv('LLAMA_N_CTX'):
-            log.info(f'Using model default context length: {context}')
-            self._server_config.n_ctx = int(context)
-        elif not context:
-            log.warning('No context length found in metadata')
-        log.info(f'Context length: {self._server_config.n_ctx}')
-
-        log.info(json.dumps(self._llm.metadata, indent=2))
+        log.debug(json.dumps(self._llm.metadata, indent=2))
         template = self._llm.metadata['tokenizer.chat_template']
 
         try:
@@ -75,7 +71,7 @@ class LlamaServer(BaseModel):
         eos = self._llm._model.token_get_text(eos_id)  # noqa: SLF001 private access
         bos = self._llm._model.token_get_text(bos_id)  # noqa: SLF001 No idea how to fix this
 
-        log.info(f'Template: {template} (EOS: {eos} {eos_id}, BOS: {bos} {bos_id})')
+        log.debug(f'Template: {template} (EOS: {eos} {eos_id}, BOS: {bos} {bos_id})')
         self._formatter = Jinja2ChatFormatter(
             template=template,
             eos_token=eos,
@@ -83,12 +79,8 @@ class LlamaServer(BaseModel):
             stop_token_ids=[eos_id],
         )
 
-        if STREAM_RESPONSE:
+        if self.client_config.stream:
             self._streamer = get_streaming_logger(self)
-
-    def get_server_config(self, key: str) -> Any:
-        """Get a config value."""
-        return self._server_config.model_dump()[key]
 
     def format(self, messages: list[ChatCompletionRequestMessage]) -> str:
         """Tokenize messages."""
@@ -102,32 +94,20 @@ class LlamaServer(BaseModel):
         """Tokenize messages."""
         return self.tokenize(self.format(messages))
 
-    def _configure(self):
-        """Read config options from environment / defaults."""
-
-        def _from_env(defaults: ConfigT) -> ConfigT:
-            ret = defaults.model_dump().copy()
-            for key in defaults.model_dump():
-                if f'LLAMA_{key.upper()}' in os.environ:
-                    ret[key] = os.environ[f'LLAMA_{key.upper()}']
-                ret[key] = type(defaults.model_dump()[key])(ret[key])
-            return type(defaults)(**ret)
-
-        self._server_config = _from_env(LlamaServerConfig.model_validate(LLAMA_SERVER_DEFAULTS))
-        self._client_config = _from_env(LlamaClientConfig.model_validate(LLAMA_CLIENT_DEFAULTS))
-
     def chat(self, messages: list[ChatCompletionRequestMessage], config: LlamaClientConfig) -> str:
         """Chat with the model."""
-        config_dict = {k: v for k, v in config.model_dump().items() if v}
-        config_dict = self._client_config.model_dump() | config_dict
-        # Returns an iterator if streaming
+        log.debug('Static parameters:')
+        _ = _config_params(self.client_config)
+        log.debug('Dynamic parameters:')
+        dynamic_params = _config_params(config)
+        log.debug('Resulting parameters:')
+        params = _config_params(self.client_config.copy(update=dynamic_params))
         ret = self._llm.create_chat_completion(
             messages=messages,
             grammar=self._grammar,
-            **config_dict,
-            stream=STREAM_RESPONSE,
+            **params,
         )
-        if STREAM_RESPONSE:
+        if self.client_config.stream:
             log.debug('Streaming response')
             gen = cast(Iterator[ChatCompletionStreamResponse], ret)
             tokens = []

@@ -1,15 +1,11 @@
 """Constants for the server."""
 
-from client.typedefs import AnyCommand, FileReadCommand, FileWriteCommand, ShellCommand
-
-LLAMA_SERVER_DEFAULTS = {
-    'n_ctx': 8192,
-    'max_tokens': 1024,
-}
-
-LLAMA_CLIENT_DEFAULTS = {
-    'temperature': 1.0,
-}
+from client.typedefs import (
+    AnyCommand,
+    FileReadCommand,
+    FileWriteCommand,
+    ShellCommand,
+)
 
 INITIAL_COMMANDS: list[AnyCommand] = [
     ShellCommand(command='ls -la', comment='List files in the current directory'),

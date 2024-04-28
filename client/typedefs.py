@@ -3,6 +3,7 @@
 from typing import Literal
 
 from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from termcolor._types import Color
 
 
@@ -20,10 +21,29 @@ class Prompt(BaseModel):
 OutputLine = tuple[float, str]
 
 
-class LlamaClientConfig(BaseModel):
+class LlamaClientConfig(BaseSettings):
     """Generation options for llama.cpp."""
 
+    model_config = SettingsConfigDict(env_prefix='LLAMA_')
+
     temperature: float | None = None
+    top_p: float | None = None
+    top_k: int | None = None
+    min_p: float | None = None
+    typical_p: float | None = None
+    stream: bool | None = None
+    seed: int | None = None
+    max_tokens: int | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    repeat_penalty: float | None = None
+    tfs_z: float | None = None
+    mirostat_mode: int | None = None
+    mirostat_tau: float | None = None
+    mirostat_eta: float | None = None
+    model: str | None = None
+    logprobs: bool | None = None
+    top_logprobs: int | None = None
 
 
 class BaseCommand(BaseModel):

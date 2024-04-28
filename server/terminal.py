@@ -18,7 +18,6 @@ from client.typedefs import (
     ShellCommand,
     ShellResult,
 )
-from server.common import env_bool
 
 log = logging.getLogger(__name__)
 
@@ -40,12 +39,10 @@ class Terminal(BaseModel):
     _stream: bool
     _streamer: logging.Logger
 
-    def __init__(self):
+    def __init__(self, stream: bool):
         """Initialize the terminal."""
         super().__init__()
-        self._stream = (
-            not env_bool('LLAMA_STREAM_RESPONSE')
-        ) and log.getEffectiveLevel() >= logging.INFO
+        self._stream = stream
         log.info(f'Streaming: {self.stream}')
 
     @property

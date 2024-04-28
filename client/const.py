@@ -4,6 +4,8 @@ Easier to have common constants for both in the client module due to the way the
 application is loaded.
 """
 
+import os
+
 from bashlex.errors import ParsingError
 from bashlex.tokenizer import MatchedPairError
 
@@ -26,7 +28,7 @@ USERTYPES = {
     '#': 'root',
 }
 
-EXIT_TIMEOUT = 10.0
+EXIT_TIMEOUT = float(os.getenv('LLAMA_EXIT_TIMEOUT', '10.0'))
 KILL_TIMEOUT = 1.0
 
 LEXER_ERRORS: dict[type, int] = {

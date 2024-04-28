@@ -135,7 +135,7 @@ class LlamaChat(BaseModel):
     def _get_prompt(self) -> list[ChatCompletionRequestMessage]:
         """Get the prompt to chat with the Llama, removing as many tokens as necessary."""
         system = self.system
-        n_ctx = self._llama.get_server_config('n_ctx')
+        n_ctx = self._llama.server_config.n_ctx
         removed = 0
         tokens, initial_tokens = None, None
         while self._history:

@@ -2,18 +2,15 @@
 
 import logging
 import os
-from contextlib import suppress
 from socket import AF_INET, SOCK_STREAM, socket
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from client.common import determine_result
 from client.const import EXIT_TIMEOUT
 from client.typedefs import (
     AnyCommand,
     AnyResult,
-    FileReadResult,
-    FileWriteResult,
     ShellResult,
 )
 from server.common import env_bool
