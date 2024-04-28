@@ -184,7 +184,9 @@ class Shell(BaseModel):
     def _lex(self, command: str) -> None | ShellResult:
         """Lex a command."""
         if re.sub(r'^#.*', '', command).strip() == '':
+            # Bashlex does not handle comments
             return self._dummy_result(command, 0)
+
         exc: tuple[int, str] | None = None
         try:
             _ = bashlex.parse(command)
@@ -354,6 +356,7 @@ class Shell(BaseModel):
             # Bash unsets PS1 on startup because it's not interactive
             ps1 = os.environ['PS1'].replace('"', '\\"')
 
+            _ = self._ensure_shell()
             self._put_stdin(
                 f'(R="$?"; PS1="{ps1}"; (exit "$R"); echo -n "${{PS1@P}}" >> {fifo}; exit "$R")'
             )
@@ -390,6 +393,10 @@ class Shell(BaseModel):
         return BaseResult(system=system, goal=goal, config=config)
 
     def _execute_shell(self, command: ShellCommand) -> ShellResult:
+        if not command.command.strip():
+            log.debug('Empty command')
+            return self._dummy_result(command.command, 0)
+
         invalid = self._lex(command.command)
         if invalid:
             log.error(f'Command refused due to syntax error: {command.command} ({invalid.stderr})')
