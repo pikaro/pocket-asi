@@ -1,5 +1,6 @@
 services:
   client:
+    hostname: system
     build:
       context: .
       dockerfile: Dockerfile.client

@@ -36,6 +36,7 @@ def _highlight_bash(command: str | None) -> str:
 class Terminal(BaseModel):
     """Pretty output for the interaction."""
 
+    suspended: bool = False
     _stream: bool
     _streamer: logging.Logger
 
@@ -54,6 +55,8 @@ class Terminal(BaseModel):
 
     def render_prompt(self, prompt: str | None = None, command: AnyCommand | None = None) -> None:
         """Render a prompt."""
+        if self.suspended:
+            return
         prompt = colored(prompt, COLORS.prompt)
         command_text = ''
         if isinstance(command, ShellCommand):
@@ -72,6 +75,8 @@ class Terminal(BaseModel):
 
     def render(self, prompt: str | None, result: AnyResult, comment: str | None = None) -> None:
         """Render a command result."""
+        if self.suspended:
+            return
         # If not streaming and not other messages, assume previous prompt is still there
         if not self.stream:
             self.render_prompt(prompt=prompt, command=result.command)

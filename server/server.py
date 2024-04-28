@@ -7,6 +7,7 @@ from socket import AF_INET, SOCK_STREAM, socket
 
 from pydantic import BaseModel, ValidationError
 
+from client.common import determine_result
 from client.const import EXIT_TIMEOUT
 from client.typedefs import (
     AnyCommand,
@@ -15,6 +16,7 @@ from client.typedefs import (
     FileWriteResult,
     ShellResult,
 )
+from server.common import env_bool
 from server.const import INITIAL_COMMANDS
 from server.llama_chat import LlamaChat
 from server.terminal import Terminal
@@ -79,26 +81,12 @@ class Server(BaseModel):
 
     def _initial_commands(self, conn: socket):
         """Run initial commands."""
+        if not env_bool('LLAMA_SHOW_INTRO'):
+            self._terminal.suspended = True
         if not self._initialized:
             self._send_commands(conn, INITIAL_COMMANDS)
             self._initialized = True
-
-    def _determine_result(self, result: str) -> AnyResult:
-        """Determine the type of result."""
-        ret = None
-        with suppress(ValidationError):
-            ret = ShellResult.model_validate_json(result)
-            log.debug(f'Result is a ShellResult: {ret}')
-        with suppress(ValidationError):
-            ret = FileReadResult.model_validate_json(result)
-            log.debug(f'Result is a FileReadResult: {ret}')
-        with suppress(ValidationError):
-            ret = FileWriteResult.model_validate_json(result)
-            log.debug(f'Result is a FileWriteResult: {ret}')
-        if ret:
-            return ret
-        _err = f'Invalid result: {result}'
-        raise ValueError(_err)
+        self._terminal.suspended = False
 
     def _read_message(self, conn: socket) -> AnyResult:
         """Read a message from the connection."""
@@ -111,7 +99,7 @@ class Server(BaseModel):
             if b'\0' in self._data:
                 message, self._data = self._data.split(b'\0', 1)
                 result_json = message.decode('utf-8')
-                return self._determine_result(result_json)
+                return determine_result(result_json, log_method=log.debug)
 
     def _send_commands(
         self,

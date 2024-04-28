@@ -29,9 +29,10 @@ comment ::= "\"comment\":" string
 # )
 
 # This allows all of ASCII printable except unescaped " and \
+# ` is prohibited entirely so the models don't use Markdown
 string ::= (
     ws "\"" (
-        [ !] | [#-\[] | [\]-~] | "\\\"" | "\\\\"
+        [ !] | [#-\[] | [\]-_] | [a-~] | "\\\"" | "\\\\"
     )* "\"" ws
 )
 
