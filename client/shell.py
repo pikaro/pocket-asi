@@ -165,6 +165,7 @@ class Shell(BaseModel):
             f'Dummy result for command: {colored(command, COLORS.prompt)}'
             f' with exit code {exit_code}'
         )
+        _ = self._ensure_shell()
         prompt = self._parse_prompt(self._get_prompt())
         system, goal, config = self._get_config()
         return ShellResult(
@@ -389,7 +390,7 @@ class Shell(BaseModel):
     def _execute_shell(self, command: ShellCommand) -> ShellResult:
         invalid = self._lex(command.command)
         if invalid:
-            log.error('Command refused due to syntax error')
+            log.error(f'Command refused due to syntax error: {command.command} ({invalid.stderr})')
             return invalid
         log.debug(f'Running command: {colored(command.command, COLORS.prompt)}')
         _ = self._ensure_shell()
