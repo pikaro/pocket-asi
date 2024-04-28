@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
 
     log_message("Looking for loader %s in %s", loader, root);
 
-    char* pattern = path_join(root, "*");
+    char* pattern = path_join(root, "*.py");
     struct LsResult ls_result = ls(pattern);
     char** file = ls_result.files;
     free(pattern);

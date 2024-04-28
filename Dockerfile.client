@@ -1,5 +1,7 @@
 FROM python:3.12
 
+SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+
 # hadolint ignore=DL3008,DL3015,DL3009
 RUN apt-get update && apt-get install -y \
     curl \
@@ -15,7 +17,10 @@ RUN --mount=type=bind,source=pyproject.toml,target=/pyproject.toml \
     poetry config virtualenvs.create false && \
     poetry install --without=dev --only=client --only=main
 
-COPY ./client /client
+ENV POCKET_ASI_MODULE=client
+ENV POCKET_ASI_ROOT=/${POCKET_ASI_MODULE}
+
+COPY ${POCKET_ASI_MODULE} ${POCKET_ASI_ROOT}
 
 ENV PYTHONPATH=/app
 ENV PS1="\\\$? \\u@\\h:\\w \\$ "
@@ -23,8 +28,6 @@ ENV PS1="\\\$? \\u@\\h:\\w \\$ "
 ENV DEBIAN_FRONTEND=noninteractive
 
 ENV POCKET_ASI_PYTHON=/usr/local/bin/python
-ENV POCKET_ASI_ROOT=/client
-ENV POCKET_ASI_MODULE=client
 ENV POCKET_ASI_LOADER=loader.py
 
 WORKDIR /app
