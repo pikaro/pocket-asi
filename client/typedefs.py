@@ -71,6 +71,7 @@ class FileWriteCommand(BaseCommand):
     content: str
 
 
+AnyFileCommand = FileReadCommand | FileWriteCommand
 AnyCommand = ShellCommand | FileReadCommand | FileWriteCommand
 
 
@@ -110,6 +111,7 @@ class FileReadResult(BaseResult):
     error: str | None = None
 
 
+AnyFileResult = FileReadResult | FileWriteResult
 AnyResult = ShellResult | FileReadResult | FileWriteResult
 
 

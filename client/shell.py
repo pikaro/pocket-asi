@@ -32,6 +32,8 @@ from client.const import (
 )
 from client.typedefs import (
     AnyCommand,
+    AnyFileCommand,
+    AnyFileResult,
     AnyResult,
     BaseResult,
     FileReadCommand,
@@ -363,18 +365,18 @@ class Shell(BaseModel):
         """Get the system, goal, and config."""
         try:
             system = Path('/app/system.md').read_text('utf-8')
-        except FileNotFoundError:
+        except (FileNotFoundError, IsADirectoryError):
             log.debug('System prompt not found')
             system = None
         try:
             goal = Path('/app/goal').read_text('utf-8').strip()
-        except FileNotFoundError:
+        except (FileNotFoundError, IsADirectoryError):
             log.debug('Goal not found')
             goal = None
         try:
             config_json = Path('/app/config.json').read_text('utf-8')
             config = LlamaClientConfig.model_validate_json(config_json)
-        except FileNotFoundError:
+        except (FileNotFoundError, IsADirectoryError):
             log.debug('Config not found')
             config = None
         except ValidationError as e:
@@ -424,44 +426,33 @@ class Shell(BaseModel):
         log_output(log.debug, ret)
         return ret
 
-    def _execute_file_read(self, command: FileReadCommand) -> FileReadResult:
-        log.debug(f'Reading file: {colored(command.file, COLORS.prompt)}')
-        try:
-            content = Path(command.file).read_text('utf-8')
-            log.debug(f'File content: {content}')
-            return FileReadResult(
-                command=command,
-                file=command.file,
-                content=content,
-                **self._get_base().model_dump(),
-            )
-        except FileNotFoundError:
-            log.debug(f'File not found: {command.file}')
-            return FileReadResult(
-                command=command,
-                file=command.file,
-                error='File not found',
-                **self._get_base().model_dump(),
-            )
+    @overload
+    def _execute_file(self, command: FileReadCommand) -> FileReadResult: ...
 
-    def _execute_file_write(self, command: FileWriteCommand) -> FileWriteResult:
-        log.debug(f'Writing file: {colored(command.file, COLORS.prompt)}')
+    @overload
+    def _execute_file(self, command: FileWriteCommand) -> FileWriteResult: ...
+
+    def _execute_file(self, command: AnyFileCommand) -> AnyFileResult:
+        log.debug(f'Reading file: {colored(command.file, COLORS.prompt)}')
+        errors: dict[type, str] = {
+            FileNotFoundError: 'File not found',
+            IsADirectoryError: 'Is a directory',
+        }
+        params = {'command': command, 'file': command.file, **self._get_base().model_dump()}
         try:
-            _ = Path(command.file).write_text(command.content, 'utf-8')
-            return FileWriteResult(
-                command=command,
-                file=command.file,
-                written=len(command.content),
-                **self._get_base().model_dump(),
-            )
+            if isinstance(command, FileReadCommand):
+                content = Path(command.file).read_text('utf-8')
+                return FileReadResult(content=content, **params)
+            if isinstance(command, FileWriteCommand):
+                _ = Path(command.file).write_text(command.content, 'utf-8')
+                return FileWriteResult(written=len(command.content), **params)
         except Exception as e:
-            log.debug(f'Failed to write file: {e}')
-            return FileWriteResult(
-                command=command,
-                file=command.file,
-                error=str(e),
-                **self._get_base().model_dump(),
-            )
+            _err = str(e)
+            if type(e) in errors:
+                _err = errors[type(e)]
+            log.debug(f'Failed to read {command.file}: {_err}')
+            cls = FileReadResult if isinstance(command, FileReadCommand) else FileWriteResult
+            return cls(error=_err, **params)
 
     @overload
     def execute(self, command: ShellCommand) -> ShellResult: ...
@@ -476,9 +467,7 @@ class Shell(BaseModel):
         """Execute a command."""
         if isinstance(command, ShellCommand):
             return self._execute_shell(command)
-        if isinstance(command, FileReadCommand):
-            return self._execute_file_read(command)
-        if isinstance(command, FileWriteCommand):
-            return self._execute_file_write(command)
+        if isinstance(command, FileReadCommand | FileWriteCommand):
+            return self._execute_file(command)
         _err = f'Invalid command type: {type(command)}'
         raise ValueError(_err)
