@@ -4,7 +4,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.client
-    volumes:
-      - ./workspace:/app
+      # Build with COPY=1 in order to copy the workspace to the container
+      # instead of mounting it. Do not activate this if the bind mount is
+      # active because the model may write large amounts of data to it,
+      # which will then get added to the build context.
+      args:
+        POCKET_ASI_COPY_WORKSPACE: "${POCKET_ASI_COPY_WORKSPACE}"
+    #volumes:
+    #  - ./workspace:/app
     environment:
       LOG_LEVEL: "${LOG_LEVEL}"

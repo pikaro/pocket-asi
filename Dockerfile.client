@@ -22,6 +22,15 @@ ENV POCKET_ASI_ROOT=/${POCKET_ASI_MODULE}
 
 COPY ${POCKET_ASI_MODULE} ${POCKET_ASI_ROOT}
 
+ARG POCKET_ASI_COPY_WORKSPACE=0
+RUN --mount=type=bind,source=workspace,target=/mutable \
+    mkdir -p /app && \
+    if [ "${POCKET_ASI_COPY_WORKSPACE:-}" = "1" ]; then \
+        tar -c -C /mutable \
+            --exclude=__pycache__ \
+        . | tar -x -C /app; \
+    fi
+
 ENV PYTHONPATH=/app
 ENV PS1="\\\$? \\u@\\h:\\w \\$ "
 
