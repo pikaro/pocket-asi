@@ -63,6 +63,9 @@ Models differ wildly in their usefulness. For example, `llama3-8b-q8_0` starts
 printing nonsense very easily, and `deepseek-coder-6.7B-q5_0` tries to write
 blog posts instead of commands.
 
+The rendering still behaves somewhat subpar, sometimes the steams aren't flushed
+properly, and various issues caused by misbehaving models need to be fixed.
+
 ## System
 
 The setup has only been tested on MacOS M2. You might have to add compilation
