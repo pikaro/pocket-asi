@@ -6,6 +6,7 @@ from client.typedefs import (
     FileWriteCommand,
     ShellCommand,
 )
+from server.common import env_bool
 
 INITIAL_COMMANDS: list[AnyCommand] = [
     ShellCommand(command='ls -la', comment='List files in the current directory'),
@@ -17,3 +18,4 @@ INITIAL_COMMANDS: list[AnyCommand] = [
 ]
 
 LLAMA_TOKEN_BUFFER = 512
+LLAMA_AUTOGEN_GRAMMAR = env_bool('LLAMA_AUTOGEN_GRAMMAR', default=True)

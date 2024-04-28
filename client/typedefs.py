@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from termcolor._types import Color
 
@@ -73,6 +73,12 @@ class FileWriteCommand(BaseCommand):
 
 AnyFileCommand = FileReadCommand | FileWriteCommand
 AnyCommand = ShellCommand | FileReadCommand | FileWriteCommand
+
+
+class AnyCommands(RootModel):
+    """A list of commands."""
+
+    root: list[AnyCommand]
 
 
 class BaseResult(BaseModel):

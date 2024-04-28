@@ -12,13 +12,18 @@ from llama_cpp import (
     CreateChatCompletionResponse,
     Llama,
     LlamaGrammar,
+    Path,
 )
 from llama_cpp.llama_chat_format import Jinja2ChatFormatter
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 
-from client.typedefs import LlamaClientConfig
+from client.typedefs import (
+    AnyCommands,
+    LlamaClientConfig,
+)
 from server.common import get_streaming_logger
+from server.const import LLAMA_AUTOGEN_GRAMMAR
 from server.typedefs import LlamaServerConfig
 
 log = logging.getLogger(__name__)
@@ -29,6 +34,11 @@ def _config_params(model: BaseSettings) -> dict[str, Any]:
     for k, v in ret.items():
         log.debug(f'{model.__class__.__name__}.{k}: {v}')
     return ret
+
+
+def _generate_grammar() -> LlamaGrammar:
+    schema = AnyCommands.model_json_schema()
+    return LlamaGrammar.from_json_schema(json.dumps(schema))
 
 
 class LlamaServer(BaseModel):
@@ -49,12 +59,18 @@ class LlamaServer(BaseModel):
     def __init__(self, *args, **kwargs):
         """Initialize the Llama server."""
         super().__init__(*args, **kwargs)
-        self._grammar = LlamaGrammar.from_file('grammar.gbnf')
+        if LLAMA_AUTOGEN_GRAMMAR:
+            log.info('Generating grammar automatically')
+            self._grammar = _generate_grammar()
+        else:
+            log.info('Loading grammar from file')
+            self._grammar = LlamaGrammar.from_file(Path('grammar.gbnf'))
+        log.debug(f'Generated grammar: {self._grammar}')
         self._llm = Llama(**_config_params(self.server_config))
 
         context = self._llm.metadata.get('llama.context_length')
         if context and self.server_config.n_ctx > int(context):
-            log.critical(f'Context lengthl {self.server_config.n_ctx} exceeds metadata {context}')
+            log.critical(f'Context length {self.server_config.n_ctx} exceeds metadata {context}')
 
         log.debug(json.dumps(self._llm.metadata, indent=2))
         template = self._llm.metadata['tokenizer.chat_template']
