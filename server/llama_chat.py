@@ -140,7 +140,7 @@ class LlamaChat(BaseModel):
         tokens, initial_tokens = None, None
         while self._history:
             prompt = [system, *_from_commands(self._history)]
-            tokens = len(self._llama.tokenize_messages(prompt))
+            tokens = len(self._llama.tokenize(prompt, special=True))
             if not initial_tokens:
                 initial_tokens = tokens
             if tokens <= n_ctx - LLAMA_TOKEN_BUFFER:

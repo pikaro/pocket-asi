@@ -68,6 +68,7 @@ class LlamaServer(BaseModel):
         except KeyError:
             bos_id = self._llm.token_bos()
 
+        # All methods to convert special tokens to text are private
         eos = self._llm._model.token_get_text(eos_id)  # noqa: SLF001 private access
         bos = self._llm._model.token_get_text(bos_id)  # noqa: SLF001 No idea how to fix this
 
@@ -83,16 +84,14 @@ class LlamaServer(BaseModel):
             self._streamer = get_streaming_logger(self)
 
     def format(self, messages: list[ChatCompletionRequestMessage]) -> str:
-        """Tokenize messages."""
+        """Format messages in the model's chat format."""
         return self._formatter(llama=self._llm, messages=messages).prompt
 
-    def tokenize(self, text: str) -> list[int]:
-        """Tokenize text."""
-        return self._llm.tokenize(text.encode('utf-8'), add_bos=True, special=True)
-
-    def tokenize_messages(self, messages: list[ChatCompletionRequestMessage]) -> list[int]:
-        """Tokenize messages."""
-        return self.tokenize(self.format(messages))
+    def tokenize(self, what: str | list[ChatCompletionRequestMessage], special: bool) -> list[int]:
+        """Tokenize text or messages."""
+        if isinstance(what, str):
+            return self._llm.tokenize(what.encode('utf-8'), add_bos=special, special=special)
+        return self.tokenize(self.format(what), special=special)
 
     def chat(self, messages: list[ChatCompletionRequestMessage], config: LlamaClientConfig) -> str:
         """Chat with the model."""
@@ -101,7 +100,7 @@ class LlamaServer(BaseModel):
         log.debug('Dynamic parameters:')
         dynamic_params = _config_params(config)
         log.debug('Resulting parameters:')
-        params = _config_params(self.client_config.copy(update=dynamic_params))
+        params = _config_params(self.client_config.model_copy(update=dynamic_params))
         ret = self._llm.create_chat_completion(
             messages=messages,
             grammar=self._grammar,
