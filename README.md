@@ -3,7 +3,7 @@
 ## Purpose
 
 `pocket-ASI` is a **shell simulator for Large Language Models** based on
-`[llama-cpp-python](https://github.com/abetlen/llama-cpp-python)`.
+[llama-cpp-python](https://github.com/abetlen/llama-cpp-python).
 
 It exposes a bash shell in a Docker container directly to the LLM, allowing it
 to execute **arbitrary commands** and interact with the filesystem.
