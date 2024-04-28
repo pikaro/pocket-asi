@@ -62,13 +62,18 @@ def log_output(method, result: AnyResult) -> None:
 
     elif isinstance(result, FileReadResult):
         if not result.error:
-            method(colored(result.content, COLORS.stdout))
+            content = result.content or ''
+            method(colored(f'Read {len(content)}B from {result.file}', COLORS.stdout))
+            for line in content.splitlines():
+                method(colored(line, COLORS.stdout))
         else:
             method(colored(result.error, COLORS.stderr))
 
     elif isinstance(result, FileWriteResult):
         if not result.error:
             method(colored(f'Wrote {result.written}B to {result.file}', COLORS.stdout))
+            for line in result.command.content.splitlines():
+                method(colored(line, COLORS.stdout))
         else:
             method(colored(result.error, COLORS.stderr))
 
