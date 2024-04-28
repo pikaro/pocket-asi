@@ -39,6 +39,11 @@ python3 server.py &
 PID=$!
 _log "Server started with PID $PID"
 
+while ! nc -z localhost "${LLAMA_PORT:-1199}"; do
+    _log "Waiting for server to start"
+    sleep 1
+done
+
 _log "Starting client"
 docker compose down
 docker compose up --build

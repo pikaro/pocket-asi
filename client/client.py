@@ -32,6 +32,11 @@ class Client(BaseModel):
             with socket(AF_INET, SOCK_STREAM) as sock:
                 log.info(f'Connecting to host.docker.internal:{port}')
                 sock.connect(('host.docker.internal', port))
+                sock.sendall(b'ping\0')
+                if sock.recv(8) != b'pong\0':
+                    log.error('Failed to connect to server')
+                    continue
+                log.info('Connected to server')
                 try:
                     self._handle_commands(sock)
                 except ConnectionError:

@@ -64,6 +64,10 @@ class Server(BaseModel):
         log.info(f'Connection accepted from {conn.getpeername()} with timeout {timeout}s')
         with conn:
             conn.settimeout(timeout)
+            if conn.recv(8) != b'ping\0':
+                log.debug('Did not receive ping')
+                return
+            conn.sendall(b'pong\0')
             self._initial_commands(conn)
             while True:
                 try:
@@ -74,7 +78,7 @@ class Server(BaseModel):
                     self._send_commands(conn, commands)
                 except ConnectionError:
                     break
-        log.info('Connection closed')
+            log.info('Connection closed')
 
     def _initial_commands(self, conn: socket):
         """Run initial commands."""
