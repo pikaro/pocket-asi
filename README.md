@@ -14,7 +14,7 @@ goal, and the system prompt** and instructions.
 The LLM server process runs on the host and communicates with the Docker
 container over a network socket.
 
-[![asciicast](.assets/screenshot.png)](https://asciinema.org/a/xhIMp7ohiJUQ9vA2OM5uDA5Dv)
+[![asciicast](https://asciinema.org/a/656764.svg)](https://asciinema.org/a/656764)
 
 ## Usage
 
