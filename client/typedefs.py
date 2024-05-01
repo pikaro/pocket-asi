@@ -121,6 +121,36 @@ AnyFileResult = FileReadResult | FileWriteResult
 AnyResult = ShellResult | FileReadResult | FileWriteResult
 
 
+class FinMessage(BaseModel):
+    """A FIN message."""
+
+    meta: Literal['FIN'] = 'FIN'
+
+
+class AckMessage(BaseModel):
+    """An ACK message."""
+
+    meta: Literal['ACK'] = 'ACK'
+
+
+class SynMessage(BaseModel):
+    """A SYN message."""
+
+    meta: Literal['SYN'] = 'SYN'
+
+
+class NopMessage(BaseModel):
+    """A NOP message."""
+
+    meta: Literal['NOP'] = 'NOP'
+
+
+AnyMetaMessage = FinMessage | AckMessage | SynMessage | NopMessage
+AnyClientRuntimeMessage = AnyResult | FinMessage
+AnyServerRuntimeMessage = AnyCommand | FinMessage
+AnyMessage = AnyResult | AnyCommand | AnyMetaMessage | AnyCommands
+
+
 class TerminalColors(BaseModel):
     """Colors for the terminal output."""
 

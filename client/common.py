@@ -7,23 +7,23 @@ import random
 import string
 from collections.abc import Callable
 from contextlib import suppress
+from inspect import isclass
 from pathlib import Path
-from typing import TypeVar
+from socket import socket
+from types import UnionType
+from typing import TypeVar, get_args, get_origin, overload
 
 import coloredlogs
 import termcolor
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from termcolor._types import Color
 
 from client.const import COLORS
 from client.typedefs import (
-    AnyCommand,
+    AnyMessage,
     AnyResult,
-    FileReadCommand,
     FileReadResult,
-    FileWriteCommand,
     FileWriteResult,
-    ShellCommand,
     ShellResult,
 )
 
@@ -94,33 +94,60 @@ def install_coloredlogs(log: logging.Logger | None = None) -> None:
     )
 
 
-DeterminationT = TypeVar('DeterminationT', bound=AnyCommand | AnyResult)
+DeterminationT = TypeVar('DeterminationT', bound=AnyMessage)
 
 
 def _determine(
-    what: str | dict,
-    valid: list[type[DeterminationT]],
-    log_method: Callable[[str], None],
+    what: str | dict, as_a: type[DeterminationT], log_method: Callable[[str], None]
 ) -> DeterminationT:
+    ret = as_a.model_validate(what) if isinstance(what, dict) else as_a.model_validate_json(what)
+    log_method(f'Determined {ret.__class__.__name__}: {ret}')
+    return ret
+
+
+@overload
+def expect(
+    what: str | dict, as_a: type[UnionType], log_method: Callable[[str], None]
+) -> AnyMessage: ...
+@overload
+def expect(
+    what: str | dict, as_a: type[DeterminationT], log_method: Callable[[str], None]
+) -> DeterminationT: ...
+
+
+def expect(what, as_a, log_method):
     """Determine the type of object."""
-    ret = None
-    for v in valid:
-        with suppress(ValidationError):
-            ret = v.parse_obj(what) if isinstance(what, dict) else v.model_validate_json(what)
-            log_method(f'{what} is a {v.__name__}: {ret}')
-    if ret:
-        return ret
+    if get_origin(as_a) == UnionType:
+        for v in get_args(as_a):
+            with suppress(ValidationError):
+                return _determine(what, v, log_method)
+        _err = f'No valid type found for {what} in {as_a}'
+    elif isclass(as_a) and issubclass(as_a, AnyMessage):
+        return _determine(what, as_a, log_method)
     _err = f'Invalid object: {what}'
     raise ValueError(_err)
 
 
-def determine_command(command: str | dict, log_method: Callable[[str], None]) -> AnyCommand:
-    """Determine the type of command."""
-    _valid = [ShellCommand, FileReadCommand, FileWriteCommand]
-    return _determine(command, _valid, log_method)
+def send_model(sock: socket | None, model: BaseModel) -> None:
+    """Send a model to a socket."""
+    if sock is None:
+        _err = 'Connection closed'
+        raise ConnectionError(_err)
+    sock.sendall(model.model_dump_json().encode('utf-8') + b'\0')
 
 
-def determine_result(result: str | dict, log_method: Callable[[str], None]) -> AnyResult:
-    """Determine the type of result."""
-    _valid = [ShellResult, FileReadResult, FileWriteResult]
-    return _determine(result, _valid, log_method)
+def read_message(sock: socket | None) -> str:
+    """Read a message from the connection."""
+    buf = b''
+    if sock is None:
+        _err = 'Connection closed'
+        raise ConnectionError(_err)
+    while True:
+        data = sock.recv(4096)
+        if not data:
+            _err = 'Connection closed'
+            raise ConnectionError(_err)
+        buf += data
+        if b'\0' in buf:
+            message, buf = buf.split(b'\0', 1)
+            return message.decode('utf-8')

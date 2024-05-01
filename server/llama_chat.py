@@ -10,8 +10,9 @@ from coloredlogs import logging
 from llama_cpp import ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage
 from pydantic import BaseModel
 
-from client.common import determine_command
+from client.common import expect
 from client.typedefs import (
+    AnyCommands,
     AnyResult,
     FileReadResult,
     FileWriteResult,
@@ -21,7 +22,6 @@ from client.typedefs import (
 from server.const import LLAMA_TOKEN_BUFFER
 from server.llama_server import LlamaServer
 from server.typedefs import (
-    LlmCommands,
     ResultHistory,
     SimpleAnyResult,
     SimpleFileReadResult,
@@ -118,6 +118,11 @@ class LlamaChat(BaseModel):
         self._goal = result.goal or os.environ['LLAMA_DEFAULT_GOAL']
         self._history.append(result)
 
+    def append_commands(self, results: list[AnyResult]) -> None:
+        """Add multiple commands to the chat history."""
+        for result in results:
+            self.append_command(result)
+
     @property
     def system(self) -> ChatCompletionRequestSystemMessage:
         """Get the system prompt."""
@@ -154,22 +159,10 @@ class LlamaChat(BaseModel):
         # Not sure how to handle this
         raise ValueError(_err)
 
-    def get_commands(self) -> LlmCommands:
+    def get_commands(self) -> AnyCommands:
         """Retrieve the commands from the Llama."""
         prompt = self._get_prompt()
         response = self._llama.chat(prompt, self._config)
-        try:
-            j = json.loads(response)
-        except json.JSONDecodeError:
-            log.warning(f'Invalid response: {response}')
-            raise
-
-        ret: LlmCommands = []
-        for command in j:
-            try:
-                ret.append(determine_command(command, log_method=log.debug))
-            except ValueError:
-                log.warning(f'Invalid response: {response}')
-                raise
-        log.debug(f'Received {len(ret)} commands')
+        ret = expect(response, AnyCommands, log_method=log.debug)
+        log.debug(f'Received {len(ret.root)} commands')
         return ret

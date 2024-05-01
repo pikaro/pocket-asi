@@ -5,7 +5,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from client.typedefs import AnyCommand, AnyResult, LlamaClientConfig
+from client.typedefs import AnyResult, LlamaClientConfig
 
 
 class LlamaServerConfig(BaseSettings):
@@ -89,6 +89,3 @@ class SimpleFileWriteResult(BaseModel):
 
 SimpleAnyResult = SimpleShellResult | SimpleFileReadResult | SimpleFileWriteResult
 ResultHistory = list[AnyResult]
-
-
-LlmCommands = list[AnyCommand]

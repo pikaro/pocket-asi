@@ -138,6 +138,13 @@ class Shell(BaseModel):
         self._open_shell()
         log.info(f'Shell started with PID {self._shell.pid}')
 
+    def cleanup(self):
+        """Close the shell."""
+        _ = self._close_shell()
+        if not self._shell_gone():
+            log.error('Failed to close shell')
+            _ = self._close_shell(kill=True)
+
     def _put_stdin(self, command: str) -> None:
         """Execute a command in the shell."""
         _ = self._stdin.write(command.encode('utf-8') + b'\n')

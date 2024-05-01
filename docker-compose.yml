@@ -10,7 +10,7 @@ services:
       # which will then get added to the build context.
       args:
         POCKET_ASI_COPY_WORKSPACE: "${POCKET_ASI_COPY_WORKSPACE}"
-    #volumes:
-    #  - ./workspace:/app
+    volumes:
+      - ./workspace:/app
     environment:
       LOG_LEVEL: "${LOG_LEVEL}"

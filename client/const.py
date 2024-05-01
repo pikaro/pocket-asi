@@ -30,6 +30,7 @@ USERTYPES = {
 
 EXIT_TIMEOUT = float(os.getenv('LLAMA_EXIT_TIMEOUT', '10.0'))
 KILL_TIMEOUT = 1.0
+RECONNECT_DELAY = 1.0
 
 LEXER_ERRORS: dict[type, int] = {
     MatchedPairError: 2,

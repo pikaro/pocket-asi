@@ -15,7 +15,7 @@ RUN --mount=type=bind,source=main.c,target=/main.c \
 RUN --mount=type=bind,source=pyproject.toml,target=/pyproject.toml \
     pip3 install --no-cache-dir poetry==1.8.2 && \
     poetry config virtualenvs.create false && \
-    poetry install --without=dev --only=client --only=main
+    poetry install --without=dev --with=client --with=main
 
 ENV POCKET_ASI_MODULE=client
 ENV POCKET_ASI_ROOT=/${POCKET_ASI_MODULE}
